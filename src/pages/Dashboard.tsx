@@ -6,10 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { authService, donorService, type DonorDetails } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/Header";
-import { User, Heart } from "lucide-react";
+import { User, Heart, Droplet, EyeOff, Trash2 } from "lucide-react";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -85,6 +86,7 @@ export default function Dashboard() {
         // Register new donor
         donorService.registerDonor({
           user_id: currentUser.user_id,
+          total_donations: 0,
           ...donorForm,
         });
         toast({
@@ -105,6 +107,63 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleMarkAsDonated = () => {
+    if (!currentUser) return;
+    
+    try {
+      const updatedDonor = donorService.markAsDonated(currentUser.user_id);
+      setDonorDetails(updatedDonor);
+      setDonorForm({
+        ...donorForm,
+        last_donation_date: updatedDonor.last_donation_date
+      });
+      toast({
+        title: "Donation Recorded",
+        description: "Thank you! You'll be available again in 3.5 months",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleHideAccount = () => {
+    if (!currentUser) return;
+    
+    authService.updateUser(currentUser.user_id, { account_status: 'hidden' });
+    toast({
+      title: "Account Hidden",
+      description: "Your profile is now temporarily hidden from search results",
+    });
+    setCurrentUser({ ...currentUser, account_status: 'hidden' });
+  };
+
+  const handleShowAccount = () => {
+    if (!currentUser) return;
+    
+    authService.updateUser(currentUser.user_id, { account_status: 'active' });
+    toast({
+      title: "Account Visible",
+      description: "Your profile is now visible in search results",
+    });
+    setCurrentUser({ ...currentUser, account_status: 'active' });
+  };
+
+  const handleDeleteAccount = () => {
+    if (!currentUser) return;
+    
+    authService.updateUser(currentUser.user_id, { account_status: 'deleted' });
+    authService.logout();
+    toast({
+      title: "Account Deleted",
+      description: "Your account has been permanently deleted",
+    });
+    navigate("/");
   };
 
   if (!currentUser) {
@@ -161,6 +220,22 @@ export default function Dashboard() {
                   onCheckedChange={handleDonorToggle}
                 />
               </div>
+
+              {currentUser.is_donor && donorDetails && (
+                <div className="pt-4 border-t">
+                  <Button 
+                    onClick={handleMarkAsDonated}
+                    variant="default"
+                    className="w-full gap-2 bg-accent hover:bg-accent/90"
+                  >
+                    <Droplet className="h-4 w-4" />
+                    I Have Donated Blood
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center mt-2">
+                    Total Donations: {donorDetails.total_donations || 0}
+                  </p>
+                </div>
+              )}
 
               {currentUser.is_donor && (
                 <form onSubmit={handleDonorFormSubmit} className="space-y-4 pt-4 border-t">
@@ -236,6 +311,63 @@ export default function Dashboard() {
                   </Button>
                 </form>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Account Management</CardTitle>
+              <CardDescription>
+                Manage your account visibility and data
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {currentUser.account_status === 'active' ? (
+                <Button 
+                  onClick={handleHideAccount}
+                  variant="outline"
+                  className="w-full gap-2"
+                >
+                  <EyeOff className="h-4 w-4" />
+                  Hide My Profile Temporarily
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleShowAccount}
+                  variant="default"
+                  className="w-full gap-2"
+                >
+                  <User className="h-4 w-4" />
+                  Show My Profile
+                </Button>
+              )}
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="destructive"
+                    className="w-full gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Account Permanently
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete your account
+                      and remove all your data from our system.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive hover:bg-destructive/90">
+                      Delete Account
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </CardContent>
           </Card>
         </div>

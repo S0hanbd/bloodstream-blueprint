@@ -4,6 +4,7 @@ export interface User {
   full_name: string;
   phone_number: string;
   is_donor: boolean;
+  account_status: 'active' | 'hidden' | 'deleted';
 }
 
 export interface DonorDetails {
@@ -14,11 +15,20 @@ export interface DonorDetails {
   department: string;
   batch_name: string;
   city_area: string;
+  total_donations: number;
+}
+
+export interface Confirmation {
+  confirmation_id: string;
+  confirmer_user_id: string;
+  donor_user_id: string;
+  confirmation_date: string;
 }
 
 const USERS_KEY = 'bloodbank_users';
 const DONORS_KEY = 'bloodbank_donors';
 const CURRENT_USER_KEY = 'bloodbank_current_user';
+const CONFIRMATIONS_KEY = 'bloodbank_confirmations';
 
 export const authService = {
   register: (userData: Omit<User, 'user_id'> & { password: string }) => {
@@ -35,6 +45,7 @@ export const authService = {
       full_name: userData.full_name,
       phone_number: userData.phone_number,
       is_donor: userData.is_donor,
+      account_status: 'active',
       password: userData.password // In real app, this would be hashed
     };
 
@@ -103,6 +114,7 @@ export const donorService = {
 
     const newDonor: DonorDetails = {
       donor_id: crypto.randomUUID(),
+      total_donations: 0,
       ...donorData
     };
 
@@ -134,21 +146,125 @@ export const donorService = {
     return donors.find(d => d.user_id === userId) || null;
   },
 
-  searchDonors: (bloodGroup: string): Array<DonorDetails & { user: User }> => {
+  searchDonors: (bloodGroup: string): Array<DonorDetails & { user: User; isAvailable: boolean }> => {
     const donors = donorService.getAllDonors();
     const users = authService.getAllUsers();
     
     const filteredDonors = donors.filter(d => d.blood_group === bloodGroup);
     
-    return filteredDonors.map(donor => {
+    const results = filteredDonors.map(donor => {
       const user = users.find(u => u.user_id === donor.user_id);
-      const { password: _, ...userWithoutPassword } = user!;
-      return { ...donor, user: userWithoutPassword };
-    }).filter(d => d.user); // Only return donors with valid user accounts
+      if (!user || user.account_status !== 'active') return null;
+      
+      const { password: _, ...userWithoutPassword } = user;
+      const isAvailable = donorService.isDonorAvailable(donor);
+      return { ...donor, user: userWithoutPassword, isAvailable };
+    }).filter(d => d !== null) as Array<DonorDetails & { user: User; isAvailable: boolean }>;
+    
+    // Sort by last donation date (most recent first)
+    return results.sort((a, b) => {
+      const dateA = new Date(a.last_donation_date).getTime();
+      const dateB = new Date(b.last_donation_date).getTime();
+      return dateB - dateA;
+    });
+  },
+
+  isDonorAvailable: (donor: DonorDetails): boolean => {
+    const lastDonationDate = new Date(donor.last_donation_date);
+    const today = new Date();
+    const daysSinceLastDonation = Math.floor((today.getTime() - lastDonationDate.getTime()) / (1000 * 60 * 60 * 24));
+    return daysSinceLastDonation >= 105; // 3.5 months = ~105 days
+  },
+
+  markAsDonated: (userId: string) => {
+    const donors = donorService.getAllDonors();
+    const donorIndex = donors.findIndex(d => d.user_id === userId);
+    
+    if (donorIndex === -1) {
+      throw new Error('Donor not found');
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    donors[donorIndex].last_donation_date = today;
+    donors[donorIndex].total_donations = (donors[donorIndex].total_donations || 0) + 1;
+    localStorage.setItem(DONORS_KEY, JSON.stringify(donors));
+    
+    return donors[donorIndex];
   },
 
   getAllDonors: (): DonorDetails[] => {
     const donorsStr = localStorage.getItem(DONORS_KEY);
     return donorsStr ? JSON.parse(donorsStr) : [];
+  }
+};
+
+export const confirmationService = {
+  confirmDonor: (confirmerUserId: string, donorUserId: string) => {
+    const confirmations = confirmationService.getAllConfirmations();
+    
+    // Check if user already confirmed this donor today
+    const today = new Date().toISOString().split('T')[0];
+    const todayConfirmations = confirmations.filter(
+      c => c.confirmer_user_id === confirmerUserId && c.confirmation_date === today
+    );
+    
+    if (todayConfirmations.length >= 2) {
+      throw new Error('You can only confirm up to 2 donors per day');
+    }
+    
+    // Check if already confirmed
+    const existing = confirmations.find(
+      c => c.confirmer_user_id === confirmerUserId && 
+           c.donor_user_id === donorUserId && 
+           c.confirmation_date === today
+    );
+    
+    if (existing) {
+      throw new Error('You already confirmed this donor today');
+    }
+
+    const newConfirmation: Confirmation = {
+      confirmation_id: crypto.randomUUID(),
+      confirmer_user_id: confirmerUserId,
+      donor_user_id: donorUserId,
+      confirmation_date: today
+    };
+
+    confirmations.push(newConfirmation);
+    localStorage.setItem(CONFIRMATIONS_KEY, JSON.stringify(confirmations));
+    
+    return newConfirmation;
+  },
+
+  getConfirmationsForDonor: (donorUserId: string): Confirmation[] => {
+    const confirmations = confirmationService.getAllConfirmations();
+    const today = new Date().toISOString().split('T')[0];
+    return confirmations.filter(
+      c => c.donor_user_id === donorUserId && c.confirmation_date === today
+    );
+  },
+
+  getAllConfirmations: (): Confirmation[] => {
+    const confirmationsStr = localStorage.getItem(CONFIRMATIONS_KEY);
+    return confirmationsStr ? JSON.parse(confirmationsStr) : [];
+  }
+};
+
+export const statisticsService = {
+  getStatistics: () => {
+    const donors = donorService.getAllDonors();
+    const users = authService.getAllUsers().filter(u => u.account_status === 'active');
+    const activeDonors = donors.filter(d => {
+      const user = users.find(u => u.user_id === d.user_id);
+      return user && user.account_status === 'active';
+    });
+    
+    const totalBags = donors.reduce((sum, donor) => sum + (donor.total_donations || 0), 0);
+    
+    return {
+      totalBags,
+      totalUsers: users.length,
+      totalDonors: activeDonors.length
+    };
   }
 };

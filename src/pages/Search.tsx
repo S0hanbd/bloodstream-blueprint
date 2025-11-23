@@ -3,15 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { authService, donorService, type DonorDetails, type User } from "@/lib/auth";
+import { Badge } from "@/components/ui/badge";
+import { authService, donorService, confirmationService, type DonorDetails, type User } from "@/lib/auth";
 import { Header } from "@/components/Header";
-import { Search as SearchIcon, Phone, Calendar, MapPin, GraduationCap, Users } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Search as SearchIcon, Phone, Calendar, MapPin, GraduationCap, Users, CheckCircle2 } from "lucide-react";
 
 export default function Search() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [bloodGroup, setBloodGroup] = useState("");
-  const [searchResults, setSearchResults] = useState<Array<DonorDetails & { user: User }>>([]);
+  const [searchResults, setSearchResults] = useState<Array<DonorDetails & { user: User; isAvailable: boolean }>>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
 
   useEffect(() => {
     const user = authService.getCurrentUser();
@@ -26,6 +30,30 @@ export default function Search() {
     const results = donorService.searchDonors(bloodGroup);
     setSearchResults(results);
     setHasSearched(true);
+  };
+
+  const handleConfirm = (donorUserId: string) => {
+    if (!currentUser) return;
+    
+    try {
+      confirmationService.confirmDonor(currentUser.user_id, donorUserId);
+      toast({
+        title: "Donor Confirmed",
+        description: "You have successfully confirmed this donor",
+      });
+      // Refresh results to update confirmation counts
+      handleSearch();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Could not confirm donor",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getConfirmationCount = (donorUserId: string): number => {
+    return confirmationService.getConfirmationsForDonor(donorUserId).length;
   };
 
   return (
@@ -90,15 +118,30 @@ export default function Search() {
                 </Card>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2">
-                  {searchResults.map((donor) => (
-                    <Card key={donor.donor_id} className="hover:shadow-lg transition-shadow">
-                      <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
-                          <span>{donor.user.full_name}</span>
-                          <span className="text-accent font-bold text-xl">{donor.blood_group}</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
+                  {searchResults.map((donor) => {
+                    const confirmationCount = getConfirmationCount(donor.user_id);
+                    return (
+                      <Card key={donor.donor_id} className="hover:shadow-lg transition-shadow">
+                        <CardHeader>
+                          <CardTitle className="flex items-center justify-between">
+                            <span>{donor.user.full_name}</span>
+                            <span className="text-accent font-bold text-xl">{donor.blood_group}</span>
+                          </CardTitle>
+                          <div className="flex gap-2 mt-2">
+                            {!donor.isAvailable && (
+                              <Badge variant="secondary" className="text-xs">
+                                Unavailable (Recently Donated)
+                              </Badge>
+                            )}
+                            {confirmationCount > 0 && (
+                              <Badge variant="default" className="text-xs gap-1">
+                                <CheckCircle2 className="h-3 w-3" />
+                                {confirmationCount} Confirmed Today
+                              </Badge>
+                            )}
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
                         <div className="flex items-center gap-2 text-sm">
                           <Phone className="h-4 w-4 text-muted-foreground" />
                           <a href={`tel:${donor.user.phone_number}`} className="text-primary hover:underline">
@@ -126,19 +169,32 @@ export default function Search() {
                           <span>{donor.city_area}</span>
                         </div>
 
-                        <Button 
-                          variant="default" 
-                          className="w-full mt-4 gap-2 bg-accent hover:bg-accent/90"
-                          asChild
-                        >
-                          <a href={`tel:${donor.user.phone_number}`}>
-                            <Phone className="h-4 w-4" />
-                            Call Donor
-                          </a>
-                        </Button>
+                        <div className="flex gap-2 mt-4">
+                          <Button 
+                            variant="default" 
+                            className="flex-1 gap-2 bg-accent hover:bg-accent/90"
+                            asChild
+                          >
+                            <a href={`tel:${donor.user.phone_number}`}>
+                              <Phone className="h-4 w-4" />
+                              Call
+                            </a>
+                          </Button>
+                          {currentUser && currentUser.user_id !== donor.user_id && (
+                            <Button 
+                              variant="outline"
+                              className="flex-1 gap-2"
+                              onClick={() => handleConfirm(donor.user_id)}
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                              Confirm
+                            </Button>
+                          )}
+                        </div>
                       </CardContent>
                     </Card>
-                  ))}
+                  );
+                })}
                 </div>
               )}
             </div>

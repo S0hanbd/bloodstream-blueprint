@@ -68,6 +68,7 @@ export default function Register() {
         full_name: formData.full_name,
         phone_number: formData.phone_number,
         is_donor: false,
+        account_status: 'active',
       });
 
       toast({
