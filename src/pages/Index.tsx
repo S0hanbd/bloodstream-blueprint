@@ -1,13 +1,65 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Header } from "@/components/Header";
-import { Droplets, Heart, Search, Shield } from "lucide-react";
+import { statisticsService } from "@/lib/auth";
+import { Droplets, Heart, Search, Shield, Activity, Users } from "lucide-react";
 
 export default function Index() {
+  const [stats, setStats] = useState({ totalBags: 0, totalUsers: 0, totalDonors: 0 });
+
+  useEffect(() => {
+    const statistics = statisticsService.getStatistics();
+    setStats(statistics);
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
+      
+      {/* Statistics Section */}
+      <section className="container py-12 border-b">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="border-accent/20 bg-accent/5">
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="p-3 bg-accent/10 rounded-full">
+                    <Droplets className="h-8 w-8 text-accent" />
+                  </div>
+                  <p className="text-4xl font-bold text-accent">{stats.totalBags}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Blood Bags Donated</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="p-3 bg-primary/10 rounded-full">
+                    <Users className="h-8 w-8 text-primary" />
+                  </div>
+                  <p className="text-4xl font-bold text-primary">{stats.totalUsers}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Registered Users</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-secondary/20 bg-secondary/5">
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="p-3 bg-secondary/10 rounded-full">
+                    <Activity className="h-8 w-8 text-secondary" />
+                  </div>
+                  <p className="text-4xl font-bold text-secondary">{stats.totalDonors}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Active Donors</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
       
       {/* Hero Section */}
       <section className="container py-20 text-center space-y-6">
