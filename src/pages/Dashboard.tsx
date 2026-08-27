@@ -10,7 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { authService, donorService, type DonorDetails } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/Header";
-import { User, Heart, Droplet, EyeOff, Trash2 } from "lucide-react";
+import { User, Heart, Droplet, EyeOff, Trash2, CheckCircle } from "lucide-react";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -121,11 +121,11 @@ export default function Dashboard() {
       });
       toast({
         title: "Donation Recorded",
-        description: "Thank you! You'll be available again in 3.5 months",
+        description: "Thank you! You'll be available again in 3.5 months (105 days).",
       });
     } catch (error) {
       toast({
-        title: "Error",
+        title: "Cannot Record Donation",
         description: error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       });
@@ -169,6 +169,11 @@ export default function Dashboard() {
   if (!currentUser) {
     return null;
   }
+
+  const isAvailable = donorDetails ? donorService.isDonorAvailable(donorDetails) : true;
+  const daysRemaining = donorDetails ? donorService.getDaysUntilAvailable(donorDetails.last_donation_date) : 0;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const hasDonatedToday = donorDetails?.last_donation_date === todayStr;
 
   return (
     <div className="min-h-screen bg-background">
@@ -222,18 +227,32 @@ export default function Dashboard() {
               </div>
 
               {currentUser.is_donor && donorDetails && (
-                <div className="pt-4 border-t">
+                <div className="pt-4 border-t space-y-2">
                   <Button 
                     onClick={handleMarkAsDonated}
-                    variant="default"
-                    className="w-full gap-2 bg-accent hover:bg-accent/90"
+                    variant={(!isAvailable || daysRemaining > 0) ? "outline" : "default"}
+                    disabled={!isAvailable || daysRemaining > 0}
+                    className={`w-full gap-2 ${(!isAvailable || daysRemaining > 0) ? 'opacity-75 cursor-not-allowed bg-muted text-muted-foreground' : 'bg-accent hover:bg-accent/90 text-white'}`}
                   >
-                    <Droplet className="h-4 w-4" />
-                    I Have Donated Blood
+                    {(!isAvailable || daysRemaining > 0) ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <Droplet className="h-4 w-4" />}
+                    {hasDonatedToday 
+                      ? "Donation Recorded Today" 
+                      : daysRemaining > 0 
+                        ? `Recently Donated (${daysRemaining}d Cooldown)` 
+                        : "I Have Donated Blood"}
                   </Button>
-                  <p className="text-xs text-muted-foreground text-center mt-2">
-                    Total Donations: {donorDetails.total_donations || 0}
-                  </p>
+                  
+                  {daysRemaining > 0 ? (
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-2 text-center text-xs text-amber-700 dark:text-amber-300">
+                      Last donation recorded on <strong>{donorDetails.last_donation_date}</strong>.
+                      <br />
+                      Eligible to donate again in <strong>{daysRemaining} days</strong>. Total Donations: <strong>{donorDetails.total_donations || 0}</strong>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Total Donations: {donorDetails.total_donations || 0}
+                    </p>
+                  )}
                 </div>
               )}
 

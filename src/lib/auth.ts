@@ -86,7 +86,6 @@ export const authService = {
     users.push(newUser);
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
 
-    // Async sync to serverless API
     fetch('/api/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -107,7 +106,6 @@ export const authService = {
     const { password: _, ...userWithoutPassword } = user;
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userWithoutPassword));
 
-    // Async sync to serverless API
     fetch('/api/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -256,8 +254,21 @@ export const donorService = {
     if (!donor.last_donation_date) return true;
     const lastDonationDate = new Date(donor.last_donation_date);
     const today = new Date();
-    const daysSinceLastDonation = Math.floor((today.getTime() - lastDonationDate.getTime()) / (1000 * 60 * 60 * 24));
+    const lastTime = new Date(lastDonationDate.getFullYear(), lastDonationDate.getMonth(), lastDonationDate.getDate()).getTime();
+    const todayTime = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    const daysSinceLastDonation = Math.floor((todayTime - lastTime) / (1000 * 60 * 60 * 24));
     return daysSinceLastDonation >= 105;
+  },
+
+  getDaysUntilAvailable: (lastDonationDateStr: string): number => {
+    if (!lastDonationDateStr) return 0;
+    const lastDate = new Date(lastDonationDateStr);
+    const today = new Date();
+    const lastTime = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate()).getTime();
+    const todayTime = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    const daysSince = Math.floor((todayTime - lastTime) / (1000 * 60 * 60 * 24));
+    const daysRemaining = 105 - daysSince;
+    return daysRemaining > 0 ? daysRemaining : 0;
   },
 
   markAsDonated: (userId: string) => {
@@ -265,7 +276,14 @@ export const donorService = {
     const donorIndex = donors.findIndex(d => d.user_id === userId);
     
     if (donorIndex === -1) {
-      throw new Error('Donor not found');
+      throw new Error('Donor details not found');
+    }
+
+    const currentDonor = donors[donorIndex];
+
+    if (!donorService.isDonorAvailable(currentDonor)) {
+      const daysRemaining = donorService.getDaysUntilAvailable(currentDonor.last_donation_date);
+      throw new Error(`You have already recorded a recent donation. You will be eligible to donate again in ${daysRemaining} days.`);
     }
 
     const today = new Date().toISOString().split('T')[0];
