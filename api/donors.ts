@@ -17,7 +17,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         const { data, error } = await queryBuilder;
         if (!error && data) {
-          let results = data.filter((d: any) => d.user && d.user.account_status === 'active');
+          let results = data.filter((d: any) => d.user && d.user.account_status === 'active').map((d: any) => {
+            const lastDonationDate = new Date(d.last_donation_date);
+            const daysSince = Math.floor((Date.now() - lastDonationDate.getTime()) / (1000 * 60 * 60 * 24));
+            const isAvailable = isNaN(daysSince) ? true : daysSince >= 105;
+            return { ...d, isAvailable };
+          });
+
           if (qStr.trim()) {
             const q = qStr.toLowerCase().trim();
             results = results.filter((d: any) =>
@@ -27,6 +33,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               d.city_area.toLowerCase().includes(q)
             );
           }
+
+          results.sort((a: any, b: any) => {
+            if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
+            const dateA = a.last_donation_date ? new Date(a.last_donation_date).getTime() : 0;
+            const dateB = b.last_donation_date ? new Date(b.last_donation_date).getTime() : 0;
+            return dateA - dateB;
+          });
+
           return res.status(200).json(results);
         }
       } catch {
@@ -55,7 +69,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const daysSince = Math.floor((Date.now() - lastDonationDate.getTime()) / (1000 * 60 * 60 * 24));
       const isAvailable = isNaN(daysSince) ? true : daysSince >= 105;
       return { ...d, user: u, isAvailable };
-    }).filter(Boolean);
+    }).filter(Boolean) as Array<DonorDetails & { user: User; isAvailable: boolean }>;
+
+    results.sort((a, b) => {
+      if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
+      const dateA = a.last_donation_date ? new Date(a.last_donation_date).getTime() : 0;
+      const dateB = b.last_donation_date ? new Date(b.last_donation_date).getTime() : 0;
+      return dateA - dateB;
+    });
 
     return res.status(200).json(results);
   }

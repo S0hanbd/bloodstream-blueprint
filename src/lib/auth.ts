@@ -243,10 +243,19 @@ export const donorService = {
       return { ...donor, user: userWithoutPassword, isAvailable };
     }).filter(d => d !== null) as Array<DonorDetails & { user: User; isAvailable: boolean }>;
     
+    // Sort:
+    // 1. Available donors FIRST (at the top), Unavailable donors AT THE BOTTOM
+    // 2. Among available donors: oldest last_donation_date first (most rested)
+    // 3. Among unavailable donors: oldest last_donation_date first (soonest to become eligible)
     return results.sort((a, b) => {
-      const dateA = new Date(a.last_donation_date).getTime();
-      const dateB = new Date(b.last_donation_date).getTime();
-      return dateB - dateA;
+      if (a.isAvailable !== b.isAvailable) {
+        return a.isAvailable ? -1 : 1;
+      }
+      
+      const dateA = a.last_donation_date ? new Date(a.last_donation_date).getTime() : 0;
+      const dateB = b.last_donation_date ? new Date(b.last_donation_date).getTime() : 0;
+      
+      return dateA - dateB;
     });
   },
 
