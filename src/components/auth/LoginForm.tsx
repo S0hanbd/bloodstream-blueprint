@@ -159,7 +159,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           <Input
             id="uap_id"
             type="text"
-            placeholder="e.g. sohanbdtech@gmail.com or 23101095"
+            placeholder="Enter your UAP ID or Email"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
             required
