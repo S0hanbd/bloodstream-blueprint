@@ -4,9 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, AlertCircle, Mail, KeyRound } from "lucide-react";
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -17,24 +26,32 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isUnconfirmed, setIsUnconfirmed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Forgot password state
+  const [resetEmail, setResetEmail] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { signInWithPassword } = useAuth();
+  const { signInWithEmailOrUapId, resetPassword, resendConfirmationEmail } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMessage(null);
+    setIsUnconfirmed(false);
 
     try {
-      // Map UAP ID to email format if plain UAP ID is entered
-      const email = identifier.includes("@") ? identifier : `${identifier}@uap-bd.edu`;
-      
-      const { data, error } = await signInWithPassword(email, password);
+      const { data, error } = await signInWithEmailOrUapId(identifier, password);
 
       if (error) {
         setErrorMessage(error.message);
+        if (error.message.toLowerCase().includes("email not confirmed")) {
+          setIsUnconfirmed(true);
+        }
         toast({
           title: "Login failed",
           description: error.message,
@@ -64,6 +81,48 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     }
   };
 
+  const handleResendConfirmation = async () => {
+    const emailToResend = identifier.includes("@") ? identifier : `${identifier}@uap-bd.edu`;
+    const { error } = await resendConfirmationEmail(emailToResend);
+    if (error) {
+      toast({
+        title: "Resend failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Verification email sent",
+        description: `Confirmation link has been resent to ${emailToResend}. Please check your inbox.`,
+      });
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail) return;
+    setIsResetting(true);
+
+    try {
+      const { error } = await resetPassword(resetEmail);
+      if (error) {
+        toast({
+          title: "Password reset failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Password reset email sent",
+          description: `Instructions have been sent to ${resetEmail}`,
+        });
+        setResetDialogOpen(false);
+      }
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   return (
     <CardContent>
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -72,10 +131,26 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             id="login-error-banner"
             role="alert"
             aria-live="polite"
-            className="p-3 text-sm rounded-md bg-destructive/10 text-destructive border border-destructive/20 flex items-center gap-2"
+            className="p-3.5 text-sm rounded-md bg-destructive/10 text-destructive border border-destructive/20 space-y-2"
           >
-            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>{errorMessage}</span>
+            <div className="flex items-center gap-2 font-medium">
+              <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>{errorMessage}</span>
+            </div>
+            {isUnconfirmed && (
+              <div className="pt-1 border-t border-destructive/20">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResendConfirmation}
+                  className="w-full text-xs gap-1.5 border-destructive/30 hover:bg-destructive/10 text-destructive min-h-[44px]"
+                >
+                  <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                  Resend Verification Email
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -84,7 +159,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           <Input
             id="uap_id"
             type="text"
-            placeholder="Enter your UAP ID or Email"
+            placeholder="e.g. sohanbdtech@gmail.com or 23101095"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
             required
@@ -95,7 +170,46 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="link" className="px-0 font-normal text-xs text-primary h-auto">
+                  Forgot Password?
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <form onSubmit={handleResetPassword} className="space-y-4">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <KeyRound className="h-5 w-5 text-primary" aria-hidden="true" />
+                      Reset Your Password
+                    </DialogTitle>
+                    <DialogDescription>
+                      Enter your registered email address to receive password reset instructions.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-2">
+                    <Label htmlFor="resetEmail">Registered Email</Label>
+                    <Input
+                      id="resetEmail"
+                      type="email"
+                      placeholder="your.email@domain.com"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      required
+                      className="min-h-[44px]"
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" disabled={isResetting} className="min-h-[44px] w-full sm:w-auto">
+                      {isResetting ? "Sending..." : "Send Password Reset Email"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
           <div className="relative">
             <Input
               id="password"

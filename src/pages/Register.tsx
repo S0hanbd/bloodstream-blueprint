@@ -84,9 +84,12 @@ export default function Register() {
           variant: "destructive",
         });
       } else {
+        const isConfirmed = Boolean(data.session);
         toast({
           title: "Registration successful",
-          description: data.session ? "Welcome to UAP Blood Bank!" : "Your account has been created. Please login.",
+          description: isConfirmed 
+            ? "Welcome to UAP Blood Bank!" 
+            : `Account created! Check your email (${email}) to confirm your account if required, then login.`,
         });
         navigate("/login");
       }
