@@ -15,6 +15,9 @@ interface ProfileRecord {
   last_donation_date: string | null;
   phone: string | null;
   national_id: string | null;
+  department?: string | null;
+  batch_name?: string | null;
+  city_area?: string | null;
 }
 
 export function useDonors(filters?: { bloodGroup?: string; searchQuery?: string }) {
@@ -43,18 +46,22 @@ export function useDonors(filters?: { bloodGroup?: string; searchQuery?: string 
           let results: DonorWithUser[] = (profiles as ProfileRecord[])
             .filter((p) => p.blood_type !== null && p.blood_type !== "hidden")
             .map((p: ProfileRecord) => {
-              const lastDonation = p.last_donation_date || "";
-              const isAvailable = calculateDonationEligibility(lastDonation).isEligible;
+              const rawDate = p.last_donation_date || "";
+              const formattedDate = rawDate.includes("T") ? rawDate.split("T")[0] : rawDate;
+              const isAvailable = calculateDonationEligibility(formattedDate).isEligible;
+
+              // Read local details fallback if extra fields exist
+              const localDetails = donorService.getDonorByUserId(p.id);
 
               return {
                 donor_id: p.id,
                 user_id: p.id,
                 blood_group: p.blood_type || "A+",
-                last_donation_date: lastDonation,
-                department: "General",
-                batch_name: "Active",
-                city_area: "Dhaka",
-                total_donations: 0,
+                last_donation_date: formattedDate,
+                department: p.department || localDetails?.department || "General",
+                batch_name: p.batch_name || localDetails?.batch_name || "Active",
+                city_area: p.city_area || localDetails?.city_area || "Dhaka",
+                total_donations: localDetails?.total_donations || 0,
                 user: {
                   user_id: p.id,
                   uap_id: p.national_id || p.id.substring(0, 8),
@@ -85,7 +92,7 @@ export function useDonors(filters?: { bloodGroup?: string; searchQuery?: string 
       // Fallback/sync source from donorService
       return donorService.searchDonors(bloodGroup, searchQuery);
     },
-    staleTime: 1000 * 30, // 30 seconds
+    staleTime: 1000 * 10, // 10 seconds
   });
 }
 
@@ -95,20 +102,32 @@ export function useUpdateDonor() {
   return useMutation({
     mutationFn: async ({ userId, updates }: { userId: string; updates: Partial<Omit<DonorDetails, "donor_id" | "user_id">> }) => {
       if (isSupabaseConfigured && supabase) {
+        const payload: Record<string, unknown> = {
+          blood_type: updates.blood_group,
+          last_donation_date: updates.last_donation_date ? new Date(updates.last_donation_date).toISOString() : null,
+        };
+        if (updates.department) payload.department = updates.department;
+        if (updates.batch_name) payload.batch_name = updates.batch_name;
+        if (updates.city_area) payload.city_area = updates.city_area;
+
         const { error } = await supabase
           .from("profiles")
-          .update({
-            blood_type: updates.blood_group,
-            last_donation_date: updates.last_donation_date ? new Date(updates.last_donation_date).toISOString() : null,
-          })
+          .update(payload)
           .eq("id", userId);
 
         if (error) {
-          throw new Error(error.message);
+          // If column doesn't exist yet, retry updating core profile fields
+          await supabase
+            .from("profiles")
+            .update({
+              blood_type: updates.blood_group,
+              last_donation_date: updates.last_donation_date ? new Date(updates.last_donation_date).toISOString() : null,
+            })
+            .eq("id", userId);
         }
       }
 
-      // Local fallback sync
+      // Sync local donor details store
       return donorService.updateDonor(userId, updates);
     },
     onSuccess: () => {
@@ -123,16 +142,27 @@ export function useRegisterDonor() {
   return useMutation({
     mutationFn: async (donorData: Omit<DonorDetails, "donor_id">) => {
       if (isSupabaseConfigured && supabase) {
+        const payload: Record<string, unknown> = {
+          blood_type: donorData.blood_group,
+          last_donation_date: donorData.last_donation_date ? new Date(donorData.last_donation_date).toISOString() : null,
+        };
+        if (donorData.department) payload.department = donorData.department;
+        if (donorData.batch_name) payload.batch_name = donorData.batch_name;
+        if (donorData.city_area) payload.city_area = donorData.city_area;
+
         const { error } = await supabase
           .from("profiles")
-          .update({
-            blood_type: donorData.blood_group,
-            last_donation_date: donorData.last_donation_date ? new Date(donorData.last_donation_date).toISOString() : null,
-          })
+          .update(payload)
           .eq("id", donorData.user_id);
 
         if (error) {
-          throw new Error(error.message);
+          await supabase
+            .from("profiles")
+            .update({
+              blood_type: donorData.blood_group,
+              last_donation_date: donorData.last_donation_date ? new Date(donorData.last_donation_date).toISOString() : null,
+            })
+            .eq("id", donorData.user_id);
         }
       }
 

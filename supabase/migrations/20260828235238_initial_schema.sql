@@ -9,9 +9,16 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   last_donation_date TIMESTAMP WITH TIME ZONE,
   phone TEXT,
   national_id TEXT,
+  department TEXT,
+  batch_name TEXT,
+  city_area TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
+
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS department TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS batch_name TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS city_area TEXT;
 
 -- 2. Create secondary tables with foreign key relationships
 CREATE TABLE IF NOT EXISTS public.donations (
