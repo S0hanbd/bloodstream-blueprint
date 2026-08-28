@@ -62,41 +62,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const trimmed = identifier.trim();
-    let targetEmail = trimmed;
 
-    // If identifier doesn't contain '@', resolve UAP ID to registered email
-    if (!trimmed.includes("@")) {
-      try {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("id, phone")
-          .eq("phone", trimmed)
-          .maybeSingle();
-
-        if (profile?.id) {
-          // Look up user email from profiles if matched
-          targetEmail = `${trimmed}@uap-bd.edu`;
-        } else {
-          targetEmail = `${trimmed}@uap-bd.edu`;
-        }
-      } catch {
-        targetEmail = `${trimmed}@uap-bd.edu`;
-      }
+    // 1. Direct email sign in
+    if (trimmed.includes("@")) {
+      return await supabase.auth.signInWithPassword({
+        email: trimmed,
+        password,
+      });
     }
 
-    // Attempt sign in with targetEmail
-    const res = await supabase.auth.signInWithPassword({
-      email: targetEmail,
+    // 2. Try auto-formatted UAP email format (e.g. 24101095@uap-bd.edu)
+    const formattedEmail = `${trimmed}@uap-bd.edu`;
+    const resFormatted = await supabase.auth.signInWithPassword({
+      email: formattedEmail,
       password,
     });
 
-    // If first attempt failed and targetEmail was auto-formatted UAP ID, try searching by phone / uap_id in profile
-    if (res.error && !trimmed.includes("@")) {
-      // Return primary response so error message propagates cleanly
-      return res;
+    if (resFormatted.data.session) {
+      return resFormatted;
     }
 
-    return res;
+    // 3. Fallback: try raw identifier string
+    const resRaw = await supabase.auth.signInWithPassword({
+      email: trimmed,
+      password,
+    });
+
+    return resRaw.data.session ? resRaw : resFormatted;
   };
 
   const signUp = async (email: string, password: string, metadata?: Record<string, unknown>): Promise<AuthResponse> => {
