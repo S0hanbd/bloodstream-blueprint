@@ -1,6 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { applyCors, memoryDonors, memoryUsers, supabase, type DonorDetails, type User } from './_store';
 
+interface SupabaseDonorRecord extends DonorDetails {
+  user?: User;
+  isAvailable?: boolean;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;
 
@@ -17,24 +22,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         const { data, error } = await queryBuilder;
         if (!error && data) {
-          let results = data.filter((d: any) => d.user && d.user.account_status === 'active').map((d: any) => {
-            const lastDonationDate = new Date(d.last_donation_date);
-            const daysSince = Math.floor((Date.now() - lastDonationDate.getTime()) / (1000 * 60 * 60 * 24));
-            const isAvailable = isNaN(daysSince) ? true : daysSince >= 105;
-            return { ...d, isAvailable };
-          });
+          let results: SupabaseDonorRecord[] = (data as SupabaseDonorRecord[])
+            .filter((d) => d.user && d.user.account_status === 'active')
+            .map((d) => {
+              const lastDonationDate = new Date(d.last_donation_date);
+              const daysSince = Math.floor((Date.now() - lastDonationDate.getTime()) / (1000 * 60 * 60 * 24));
+              const isAvailable = isNaN(daysSince) ? true : daysSince >= 90;
+              return { ...d, isAvailable };
+            });
 
           if (qStr.trim()) {
             const q = qStr.toLowerCase().trim();
-            results = results.filter((d: any) =>
-              d.user.full_name.toLowerCase().includes(q) ||
-              d.user.uap_id.toLowerCase().includes(q) ||
+            results = results.filter((d) =>
+              (d.user?.full_name || '').toLowerCase().includes(q) ||
+              (d.user?.uap_id || '').toLowerCase().includes(q) ||
               d.department.toLowerCase().includes(q) ||
               d.city_area.toLowerCase().includes(q)
             );
           }
 
-          results.sort((a: any, b: any) => {
+          results.sort((a, b) => {
             if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
             const dateA = a.last_donation_date ? new Date(a.last_donation_date).getTime() : 0;
             const dateB = b.last_donation_date ? new Date(b.last_donation_date).getTime() : 0;
@@ -49,27 +56,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Memory fallback logic
-    let filtered = memoryDonors.filter(d => {
+    const filtered = memoryDonors.filter((d) => {
       if (bgStr && bgStr !== 'ALL' && d.blood_group !== bgStr) return false;
       return true;
     });
 
-    const results = filtered.map(d => {
-      const u = memoryUsers.find(user => user.user_id === d.user_id);
-      if (!u || u.account_status !== 'active') return null;
-      if (qStr.trim()) {
-        const q = qStr.toLowerCase().trim();
-        const matchesName = u.full_name.toLowerCase().includes(q);
-        const matchesId = u.uap_id.toLowerCase().includes(q);
-        const matchesDept = d.department.toLowerCase().includes(q);
-        const matchesArea = d.city_area.toLowerCase().includes(q);
-        if (!matchesName && !matchesId && !matchesDept && !matchesArea) return null;
-      }
-      const lastDonationDate = new Date(d.last_donation_date);
-      const daysSince = Math.floor((Date.now() - lastDonationDate.getTime()) / (1000 * 60 * 60 * 24));
-      const isAvailable = isNaN(daysSince) ? true : daysSince >= 105;
-      return { ...d, user: u, isAvailable };
-    }).filter(Boolean) as Array<DonorDetails & { user: User; isAvailable: boolean }>;
+    const results = filtered
+      .map((d) => {
+        const u = memoryUsers.find((user) => user.user_id === d.user_id);
+        if (!u || u.account_status !== 'active') return null;
+        if (qStr.trim()) {
+          const q = qStr.toLowerCase().trim();
+          const matchesName = u.full_name.toLowerCase().includes(q);
+          const matchesId = u.uap_id.toLowerCase().includes(q);
+          const matchesDept = d.department.toLowerCase().includes(q);
+          const matchesArea = d.city_area.toLowerCase().includes(q);
+          if (!matchesName && !matchesId && !matchesDept && !matchesArea) return null;
+        }
+        const lastDonationDate = new Date(d.last_donation_date);
+        const daysSince = Math.floor((Date.now() - lastDonationDate.getTime()) / (1000 * 60 * 60 * 24));
+        const isAvailable = isNaN(daysSince) ? true : daysSince >= 90;
+        return { ...d, user: u, isAvailable };
+      })
+      .filter((item): item is DonorDetails & { user: User; isAvailable: boolean } => item !== null);
 
     results.sort((a, b) => {
       if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
@@ -89,15 +98,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (supabase) {
       try {
-        const { data, error } = await supabase.from('donors').insert([{
-          user_id: donorData.user_id,
-          blood_group: donorData.blood_group,
-          last_donation_date: donorData.last_donation_date,
-          department: donorData.department,
-          batch_name: donorData.batch_name,
-          city_area: donorData.city_area,
-          total_donations: 0
-        }]).select().single();
+        const { data, error } = await supabase
+          .from('donors')
+          .insert([
+            {
+              user_id: donorData.user_id,
+              blood_group: donorData.blood_group,
+              last_donation_date: donorData.last_donation_date,
+              department: donorData.department,
+              batch_name: donorData.batch_name,
+              city_area: donorData.city_area,
+              total_donations: 0,
+            },
+          ])
+          .select()
+          .single();
         if (!error && data) {
           await supabase.from('users').update({ is_donor: true }).eq('user_id', donorData.user_id);
           return res.status(201).json(data);
@@ -110,10 +125,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const newDonor: DonorDetails = {
       donor_id: `d_${Date.now()}`,
       total_donations: 0,
-      ...donorData
+      ...donorData,
     };
     memoryDonors.push(newDonor);
-    const u = memoryUsers.find(user => user.user_id === donorData.user_id);
+    const u = memoryUsers.find((user) => user.user_id === donorData.user_id);
     if (u) u.is_donor = true;
 
     return res.status(201).json(newDonor);

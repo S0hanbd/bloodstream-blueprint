@@ -10,14 +10,23 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { authService, donorService, type DonorDetails } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/Header";
-import { User, Heart, Droplet, EyeOff, Trash2, CheckCircle } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useUpdateDonor, useRegisterDonor, useRecordDonation } from "@/hooks/useDonors";
+import { DonationForm } from "@/components/donations/DonationForm";
+import { usePageTitle } from "@/hooks/usePageTitle";
+import { User, Heart, EyeOff, Trash2, Loader2 } from "lucide-react";
 
 export default function Dashboard() {
+  usePageTitle("Donor Dashboard");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user: supabaseUser, signOut } = useAuth();
   const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
   const [donorDetails, setDonorDetails] = useState<DonorDetails | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+
+  const updateDonorMutation = useUpdateDonor();
+  const registerDonorMutation = useRegisterDonor();
+  const recordDonationMutation = useRecordDonation();
 
   const [donorForm, setDonorForm] = useState({
     blood_group: "",
@@ -29,33 +38,32 @@ export default function Dashboard() {
 
   useEffect(() => {
     const user = authService.getCurrentUser();
-    if (!user) {
+    if (!user && !supabaseUser) {
       navigate("/login");
       return;
     }
-    setCurrentUser(user);
-
-    // Load donor details if user is a donor
-    if (user.is_donor) {
-      const details = donorService.getDonorByUserId(user.user_id);
-      if (details) {
-        setDonorDetails(details);
-        setDonorForm({
-          blood_group: details.blood_group,
-          last_donation_date: details.last_donation_date,
-          department: details.department,
-          batch_name: details.batch_name,
-          city_area: details.city_area,
-        });
+    if (user) {
+      setCurrentUser(user);
+      if (user.is_donor) {
+        const details = donorService.getDonorByUserId(user.user_id);
+        if (details) {
+          setDonorDetails(details);
+          setDonorForm({
+            blood_group: details.blood_group,
+            last_donation_date: details.last_donation_date,
+            department: details.department,
+            batch_name: details.batch_name,
+            city_area: details.city_area,
+          });
+        }
       }
     }
-  }, [navigate]);
+  }, [navigate, supabaseUser]);
 
   const handleDonorToggle = async (checked: boolean) => {
     if (!currentUser) return;
 
     if (!checked) {
-      // User wants to stop being a donor
       authService.updateUser(currentUser.user_id, { is_donor: false });
       setCurrentUser({ ...currentUser, is_donor: false });
       toast({
@@ -63,7 +71,6 @@ export default function Dashboard() {
         description: "You are no longer listed as a donor",
       });
     } else {
-      // User wants to become a donor - show the form
       setCurrentUser({ ...currentUser, is_donor: true });
     }
   };
@@ -72,19 +79,18 @@ export default function Dashboard() {
     e.preventDefault();
     if (!currentUser) return;
 
-    setIsLoading(true);
-
     try {
       if (donorDetails) {
-        // Update existing donor
-        donorService.updateDonor(currentUser.user_id, donorForm);
+        await updateDonorMutation.mutateAsync({
+          userId: currentUser.user_id,
+          updates: donorForm,
+        });
         toast({
           title: "Donor details updated",
           description: "Your information has been updated successfully",
         });
       } else {
-        // Register new donor
-        donorService.registerDonor({
+        await registerDonorMutation.mutateAsync({
           user_id: currentUser.user_id,
           total_donations: 0,
           ...donorForm,
@@ -95,7 +101,6 @@ export default function Dashboard() {
         });
       }
       
-      // Reload donor details
       const details = donorService.getDonorByUserId(currentUser.user_id);
       setDonorDetails(details);
     } catch (error) {
@@ -104,21 +109,22 @@ export default function Dashboard() {
         description: error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const handleMarkAsDonated = () => {
+  const handleMarkAsDonated = async () => {
     if (!currentUser) return;
     
     try {
-      const updatedDonor = donorService.markAsDonated(currentUser.user_id);
-      setDonorDetails(updatedDonor);
-      setDonorForm({
-        ...donorForm,
-        last_donation_date: updatedDonor.last_donation_date
-      });
+      await recordDonationMutation.mutateAsync({ userId: currentUser.user_id });
+      const updatedDonor = donorService.getDonorByUserId(currentUser.user_id);
+      if (updatedDonor) {
+        setDonorDetails(updatedDonor);
+        setDonorForm({
+          ...donorForm,
+          last_donation_date: updatedDonor.last_donation_date,
+        });
+      }
       toast({
         title: "Donation Recorded",
         description: "Thank you! You'll be available again in 3.5 months (105 days).",
@@ -154,11 +160,12 @@ export default function Dashboard() {
     setCurrentUser({ ...currentUser, account_status: 'active' });
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
     if (!currentUser) return;
     
     authService.updateUser(currentUser.user_id, { account_status: 'deleted' });
     authService.logout();
+    await signOut();
     toast({
       title: "Account Deleted",
       description: "Your account has been permanently deleted",
@@ -166,14 +173,14 @@ export default function Dashboard() {
     navigate("/");
   };
 
-  if (!currentUser) {
+  if (!currentUser && !supabaseUser) {
     return null;
   }
 
-  const isAvailable = donorDetails ? donorService.isDonorAvailable(donorDetails) : true;
-  const daysRemaining = donorDetails ? donorService.getDaysUntilAvailable(donorDetails.last_donation_date) : 0;
-  const todayStr = new Date().toISOString().split('T')[0];
-  const hasDonatedToday = donorDetails?.last_donation_date === todayStr;
+  const userDisplayName = currentUser?.full_name || supabaseUser?.user_metadata?.full_name || "User";
+  const userUapId = currentUser?.uap_id || supabaseUser?.user_metadata?.uap_id || "N/A";
+  const userPhone = currentUser?.phone_number || supabaseUser?.user_metadata?.phone || "N/A";
+  const isSubmitting = updateDonorMutation.isPending || registerDonorMutation.isPending || recordDonationMutation.isPending;
 
   return (
     <div className="min-h-screen bg-background">
@@ -192,15 +199,15 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-muted-foreground">UAP ID</Label>
-                  <p className="font-medium">{currentUser.uap_id}</p>
+                  <p className="font-medium">{userUapId}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Full Name</Label>
-                  <p className="font-medium">{currentUser.full_name}</p>
+                  <p className="font-medium">{userDisplayName}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Phone Number</Label>
-                  <p className="font-medium">{currentUser.phone_number}</p>
+                  <p className="font-medium">{userPhone}</p>
                 </div>
               </div>
             </CardContent>
@@ -221,82 +228,73 @@ export default function Dashboard() {
                 <Label htmlFor="donor-toggle">Available to donate blood</Label>
                 <Switch
                   id="donor-toggle"
-                  checked={currentUser.is_donor}
+                  checked={currentUser?.is_donor ?? true}
                   onCheckedChange={handleDonorToggle}
                 />
               </div>
 
-              {currentUser.is_donor && donorDetails && (
-                <div className="pt-4 border-t space-y-2">
-                  <Button 
-                    onClick={handleMarkAsDonated}
-                    variant={(!isAvailable || daysRemaining > 0) ? "outline" : "default"}
-                    disabled={!isAvailable || daysRemaining > 0}
-                    className={`w-full gap-2 ${(!isAvailable || daysRemaining > 0) ? 'opacity-75 cursor-not-allowed bg-muted text-muted-foreground' : 'bg-accent hover:bg-accent/90 text-white'}`}
-                  >
-                    {(!isAvailable || daysRemaining > 0) ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <Droplet className="h-4 w-4" />}
-                    {hasDonatedToday 
-                      ? "Donation Recorded Today" 
-                      : daysRemaining > 0 
-                        ? `Recently Donated (${daysRemaining}d Cooldown)` 
-                        : "I Have Donated Blood"}
-                  </Button>
-                  
-                  {daysRemaining > 0 ? (
-                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-2 text-center text-xs text-amber-700 dark:text-amber-300">
-                      Last donation recorded on <strong>{donorDetails.last_donation_date}</strong>.
-                      <br />
-                      Eligible to donate again in <strong>{daysRemaining} days</strong>. Total Donations: <strong>{donorDetails.total_donations || 0}</strong>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground text-center">
-                      Total Donations: {donorDetails.total_donations || 0}
-                    </p>
-                  )}
+              {currentUser?.is_donor && donorDetails && (
+                <div className="pt-4 border-t">
+                  <DonationForm
+                    lastDonationDate={donorDetails.last_donation_date}
+                    onConfirmDonation={handleMarkAsDonated}
+                    isLoading={recordDonationMutation.isPending}
+                  />
                 </div>
               )}
+            </CardContent>
+          </Card>
 
-              {currentUser.is_donor && (
-                <form onSubmit={handleDonorFormSubmit} className="space-y-4 pt-4 border-t">
-                  <div className="space-y-2">
-                    <Label htmlFor="blood_group">Blood Group</Label>
-                    <Select
-                      value={donorForm.blood_group}
-                      onValueChange={(value) => setDonorForm({ ...donorForm, blood_group: value })}
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select blood group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="A+">A+</SelectItem>
-                        <SelectItem value="A-">A-</SelectItem>
-                        <SelectItem value="B+">B+</SelectItem>
-                        <SelectItem value="B-">B-</SelectItem>
-                        <SelectItem value="AB+">AB+</SelectItem>
-                        <SelectItem value="AB-">AB-</SelectItem>
-                        <SelectItem value="O+">O+</SelectItem>
-                        <SelectItem value="O-">O-</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+          {currentUser?.is_donor && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{donorDetails ? "Edit Donor Profile" : "Register as Donor"}</CardTitle>
+                <CardDescription>
+                  Keep your blood group, donation dates, and location up to date so patients can find you
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleDonorFormSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="blood_group">Blood Group</Label>
+                      <Select 
+                        value={donorForm.blood_group} 
+                        onValueChange={(val) => setDonorForm({ ...donorForm, blood_group: val })}
+                      >
+                        <SelectTrigger id="blood_group">
+                          <SelectValue placeholder="Select blood group" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="A+">A+</SelectItem>
+                          <SelectItem value="A-">A-</SelectItem>
+                          <SelectItem value="B+">B+</SelectItem>
+                          <SelectItem value="B-">B-</SelectItem>
+                          <SelectItem value="AB+">AB+</SelectItem>
+                          <SelectItem value="AB-">AB-</SelectItem>
+                          <SelectItem value="O+">O+</SelectItem>
+                          <SelectItem value="O-">O-</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="last_donation_date">Last Donation Date</Label>
-                    <Input
-                      id="last_donation_date"
-                      type="date"
-                      value={donorForm.last_donation_date}
-                      onChange={(e) => setDonorForm({ ...donorForm, last_donation_date: e.target.value })}
-                      required
-                    />
+                    <div className="space-y-2">
+                      <Label htmlFor="last_donation_date">Last Donation Date</Label>
+                      <Input
+                        id="last_donation_date"
+                        type="date"
+                        max={new Date().toISOString().split("T")[0]}
+                        value={donorForm.last_donation_date}
+                        onChange={(e) => setFormDataDate(e.target.value)}
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="department">Department</Label>
                     <Input
                       id="department"
-                      placeholder="e.g., CSE, BBA, EEE"
+                      placeholder="e.g. Computer Science & Engineering"
                       value={donorForm.department}
                       onChange={(e) => setDonorForm({ ...donorForm, department: e.target.value })}
                       required
@@ -304,10 +302,10 @@ export default function Dashboard() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="batch_name">Batch Name</Label>
+                    <Label htmlFor="batch_name">Batch / Semester</Label>
                     <Input
                       id="batch_name"
-                      placeholder="e.g., Projjolon-55, Pronoyon-50"
+                      placeholder="e.g. Fall 2021"
                       value={donorForm.batch_name}
                       onChange={(e) => setDonorForm({ ...donorForm, batch_name: e.target.value })}
                       required
@@ -315,57 +313,64 @@ export default function Dashboard() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="city_area">City/Area</Label>
+                    <Label htmlFor="city_area">Location / City Area</Label>
                     <Input
                       id="city_area"
-                      placeholder="e.g., Dhaka, Uttara"
+                      placeholder="e.g. Dhanmondi, Dhaka"
                       value={donorForm.city_area}
                       onChange={(e) => setDonorForm({ ...donorForm, city_area: e.target.value })}
                       required
                     />
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Saving..." : donorDetails ? "Update Donor Details" : "Register as Donor"}
+                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Saving changes...
+                      </span>
+                    ) : donorDetails ? (
+                      "Update Donor Details"
+                    ) : (
+                      "Register as Donor"
+                    )}
                   </Button>
                 </form>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
-          <Card>
+          <Card className="border-destructive/20">
             <CardHeader>
-              <CardTitle>Account Management</CardTitle>
-              <CardDescription>
-                Manage your account visibility and data
-              </CardDescription>
+              <CardTitle className="text-lg">Account Actions</CardTitle>
+              <CardDescription>Privacy and visibility settings</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {currentUser.account_status === 'active' ? (
+              {currentUser?.account_status === 'hidden' ? (
                 <Button 
-                  onClick={handleHideAccount}
-                  variant="outline"
-                  className="w-full gap-2"
+                  variant="outline" 
+                  onClick={handleShowAccount}
+                  className="w-full justify-start gap-2"
                 >
                   <EyeOff className="h-4 w-4" />
-                  Hide My Profile Temporarily
+                  Make Profile Visible Again
                 </Button>
               ) : (
                 <Button 
-                  onClick={handleShowAccount}
-                  variant="default"
-                  className="w-full gap-2"
+                  variant="outline" 
+                  onClick={handleHideAccount}
+                  className="w-full justify-start gap-2 text-amber-600 hover:text-amber-700"
                 >
-                  <User className="h-4 w-4" />
-                  Show My Profile
+                  <EyeOff className="h-4 w-4" />
+                  Hide Profile from Search Results
                 </Button>
               )}
 
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button 
-                    variant="destructive"
-                    className="w-full gap-2"
+                    variant="outline" 
+                    className="w-full justify-start gap-2 text-destructive hover:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" />
                     Delete Account Permanently
@@ -375,13 +380,15 @@ export default function Dashboard() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete your account
-                      and remove all your data from our system.
+                      This action will permanently delete your account and remove your profile from the blood donor search registry.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive hover:bg-destructive/90">
+                    <AlertDialogAction 
+                      onClick={handleDeleteAccount}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
                       Delete Account
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -393,4 +400,8 @@ export default function Dashboard() {
       </div>
     </div>
   );
+
+  function setFormDataDate(val: string) {
+    setDonorForm((prev) => ({ ...prev, last_donation_date: val }));
+  }
 }

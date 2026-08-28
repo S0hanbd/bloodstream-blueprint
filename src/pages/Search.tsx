@@ -1,45 +1,36 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { authService, donorService, confirmationService, type DonorDetails, type User } from "@/lib/auth";
+import { confirmationService } from "@/lib/auth";
 import { Header } from "@/components/Header";
 import { useToast } from "@/hooks/use-toast";
-import { Search as SearchIcon, Phone, Calendar, MapPin, GraduationCap, Users, CheckCircle2, IdCard, RefreshCw } from "lucide-react";
+import { useDonors } from "@/hooks/useDonors";
+import { useAppStore } from "@/store/useAppStore";
+import { useAuth } from "@/hooks/useAuth";
+import { usePageTitle } from "@/hooks/usePageTitle";
+import { Search as SearchIcon, Phone, Calendar, MapPin, GraduationCap, Users, CheckCircle2, IdCard, Loader2, AlertCircle } from "lucide-react";
 
 export default function Search() {
+  usePageTitle("Search Blood Donors");
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const [bloodGroup, setBloodGroup] = useState("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Array<DonorDetails & { user: User; isAvailable: boolean }>>([]);
-  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
-
-  const executeSearch = (group = bloodGroup, query = searchQuery) => {
-    const results = donorService.searchDonors(group, query);
-    setSearchResults(results);
-  };
+  const { user: currentUser } = useAuth();
+  
+  const { bloodGroup, searchQuery, setBloodGroup, setSearchQuery } = useAppStore();
 
   useEffect(() => {
-    executeSearch(bloodGroup, searchQuery);
-  }, [bloodGroup, searchQuery]);
+    const bgParam = searchParams.get("bloodGroup");
+    const qParam = searchParams.get("query");
+    if (bgParam) setBloodGroup(bgParam);
+    if (qParam !== null) setSearchQuery(qParam);
+  }, [searchParams, setBloodGroup, setSearchQuery]);
 
-  const handleSearch = () => {
-    executeSearch(bloodGroup, searchQuery);
-  };
-
-  const handleResetData = () => {
-    localStorage.removeItem("bloodbank_users");
-    localStorage.removeItem("bloodbank_donors");
-    executeSearch("ALL", "");
-    toast({
-      title: "Data Reset",
-      description: "Dummy donors reloaded into localStorage!",
-    });
-  };
+  const { data: searchResults = [], isLoading, isError, error, refetch } = useDonors({ bloodGroup, searchQuery });
 
   const handleConfirm = (donorUserId: string) => {
     if (!currentUser) {
@@ -53,16 +44,16 @@ export default function Search() {
     }
     
     try {
-      confirmationService.confirmDonor(currentUser.user_id, donorUserId);
+      confirmationService.confirmDonor(currentUser.id, donorUserId);
       toast({
         title: "Donor Confirmed",
         description: "You have successfully confirmed this donor",
       });
-      executeSearch();
-    } catch (error) {
+      refetch();
+    } catch (err: unknown) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Could not confirm donor",
+        description: err instanceof Error ? err.message : "Could not confirm donor",
         variant: "destructive",
       });
     }
@@ -81,13 +72,9 @@ export default function Search() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <SearchIcon className="h-5 w-5 text-primary" />
+                  <SearchIcon className="h-5 w-5 text-primary" aria-hidden="true" />
                   <CardTitle>Find Blood Donors</CardTitle>
                 </div>
-                <Button variant="ghost" size="sm" onClick={handleResetData} className="text-xs text-muted-foreground gap-1.5">
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Reload Dummy Donors
-                </Button>
               </div>
               <CardDescription>
                 Search for available blood donors by blood group, registration number, or name
@@ -96,8 +83,8 @@ export default function Search() {
             <CardContent>
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="w-full md:w-48">
-                  <Select value={bloodGroup} onValueChange={(val) => { setBloodGroup(val); }}>
-                    <SelectTrigger>
+                  <Select value={bloodGroup} onValueChange={(val) => setBloodGroup(val)}>
+                    <SelectTrigger aria-label="Select blood group filter">
                       <SelectValue placeholder="Blood group" />
                     </SelectTrigger>
                     <SelectContent>
@@ -115,14 +102,14 @@ export default function Search() {
                 </div>
                 <div className="flex-1">
                   <Input 
+                    aria-label="Search by registration number or name"
                     placeholder="Search by Reg No (e.g. 14101095) or Name..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                   />
                 </div>
-                <Button onClick={handleSearch} className="gap-2">
-                  <SearchIcon className="h-4 w-4" />
+                <Button onClick={() => refetch()} className="gap-2 min-h-[44px]" aria-label="Search blood donors">
+                  <SearchIcon className="h-4 w-4" aria-hidden="true" />
                   Search
                 </Button>
               </div>
@@ -130,22 +117,44 @@ export default function Search() {
           </Card>
 
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold">
-              {searchResults.length > 0 
-                ? `Found ${searchResults.length} donor${searchResults.length !== 1 ? 's' : ''}`
-                : "No donors found"}
+            <h2 className="text-2xl font-bold flex items-center justify-between">
+              <span>
+                {isLoading
+                  ? "Fetching donors..."
+                  : searchResults.length > 0 
+                  ? `Found ${searchResults.length} donor${searchResults.length !== 1 ? 's' : ''}`
+                  : "No donors found"}
+              </span>
             </h2>
 
-            {searchResults.length === 0 ? (
+            {/* Error UI State */}
+            {isError && (
+              <Card className="border-destructive">
+                <CardContent className="flex items-center gap-3 py-6 text-destructive">
+                  <AlertCircle className="h-6 w-6" aria-hidden="true" />
+                  <div>
+                    <p className="font-semibold">Failed to fetch donor data</p>
+                    <p className="text-sm opacity-90">{error instanceof Error ? error.message : "Network error"}</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-auto min-h-[44px]" aria-label="Retry search query">
+                    Retry
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Loading UI State */}
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
+                <p className="text-muted-foreground text-sm">Loading donor registry from Supabase...</p>
+              </div>
+            ) : searchResults.length === 0 && !isError ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12 space-y-4">
                   <p className="text-muted-foreground text-center">
-                    No donors matching your search criteria were found in your browser cache.
+                    No donors matching your search criteria were found in the database.
                   </p>
-                  <Button variant="outline" size="sm" onClick={handleResetData} className="gap-2">
-                    <RefreshCw className="h-4 w-4" />
-                    Load 15 Dummy Bangladeshi Donors
-                  </Button>
                 </CardContent>
               </Card>
             ) : (
@@ -159,7 +168,7 @@ export default function Search() {
                           <div>
                             <span className="block font-semibold text-lg">{donor.user.full_name}</span>
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-normal mt-0.5">
-                              <IdCard className="h-3.5 w-3.5 text-primary" />
+                              <IdCard className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
                               <span>Reg No: <strong>{donor.user.uap_id}</strong></span>
                             </div>
                           </div>
@@ -175,7 +184,7 @@ export default function Search() {
                           )}
                           {confirmationCount > 0 && (
                             <Badge variant="default" className="text-xs gap-1">
-                              <CheckCircle2 className="h-3 w-3" />
+                              <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                               {confirmationCount} Confirmed Today
                             </Badge>
                           )}
@@ -183,50 +192,52 @@ export default function Search() {
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div className="flex items-center gap-2 text-sm">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          <a href={`tel:${donor.user.phone_number}`} className="text-primary hover:underline font-medium">
+                          <Phone className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                          <a href={`tel:${donor.user.phone_number}`} className="text-primary hover:underline font-medium min-h-[44px] inline-flex items-center" aria-label={`Call donor ${donor.user.full_name}`}>
                             {donor.user.phone_number}
                           </a>
                         </div>
                         
                         <div className="flex items-center gap-2 text-sm">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>Last donated: {donor.last_donation_date}</span>
+                          <Calendar className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                          <span>Last donated: {donor.last_donation_date || "Never"}</span>
                         </div>
                         
                         <div className="flex items-center gap-2 text-sm">
-                          <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                          <GraduationCap className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                           <span>{donor.department}</span>
                         </div>
                         
                         <div className="flex items-center gap-2 text-sm">
-                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <Users className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                           <span>{donor.batch_name}</span>
                         </div>
                         
                         <div className="flex items-center gap-2 text-sm">
-                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <MapPin className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                           <span>{donor.city_area}</span>
                         </div>
 
                         <div className="flex gap-2 mt-4">
                           <Button 
                             variant="default" 
-                            className="flex-1 gap-2 bg-accent hover:bg-accent/90"
+                            className="flex-1 gap-2 bg-accent hover:bg-accent/90 min-h-[44px]"
+                            aria-label={`Call ${donor.user.full_name}`}
                             asChild
                           >
                             <a href={`tel:${donor.user.phone_number}`}>
-                              <Phone className="h-4 w-4" />
+                              <Phone className="h-4 w-4" aria-hidden="true" />
                               Call
                             </a>
                           </Button>
-                          {currentUser && currentUser.user_id !== donor.user_id && (
+                          {currentUser && currentUser.id !== donor.user_id && (
                             <Button 
                               variant="outline"
-                              className="flex-1 gap-2"
+                              className="flex-1 gap-2 min-h-[44px]"
+                              aria-label={`Confirm donor ${donor.user.full_name}`}
                               onClick={() => handleConfirm(donor.user_id)}
                             >
-                              <CheckCircle2 className="h-4 w-4" />
+                              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                               Confirm
                             </Button>
                           )}

@@ -1,3 +1,5 @@
+import { calculateDonationEligibility } from "@/logic/cooldown";
+
 export interface User {
   user_id: string;
   uap_id: string;
@@ -30,22 +32,22 @@ const DONORS_KEY = 'bloodbank_donors';
 const CURRENT_USER_KEY = 'bloodbank_current_user';
 const CONFIRMATIONS_KEY = 'bloodbank_confirmations';
 
-export const INITIAL_USERS: Array<User & { password: string }> = [
-  { user_id: "u14101095", uap_id: "14101095", full_name: "Tanvir Hasan", phone_number: "01711223344", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u24202074", uap_id: "24202074", full_name: "Arifur Rahman", phone_number: "01812345678", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u18101023", uap_id: "18101023", full_name: "Nusrat Jahan", phone_number: "01911998877", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u19201056", uap_id: "19201056", full_name: "Sumaiya Akter", phone_number: "01555667788", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u20101088", uap_id: "20101088", full_name: "Farhan Ahmed", phone_number: "01677889900", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u21101012", uap_id: "21101012", full_name: "Mahfuzur Rahman", phone_number: "01300112233", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u22101045", uap_id: "22101045", full_name: "Kazi Nazrul Islam", phone_number: "01722334455", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u23101067", uap_id: "23101067", full_name: "Tasmia Islam", phone_number: "01833445566", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u15101034", uap_id: "15101034", full_name: "Rakibul Hossain", phone_number: "01944556677", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u16201089", uap_id: "16201089", full_name: "Shahriar Kabir", phone_number: "01511224466", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u17101099", uap_id: "17101099", full_name: "Sadia Sultana", phone_number: "01622446688", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u18201011", uap_id: "18201011", full_name: "Imtiaz Mahmud", phone_number: "01733557799", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u19101077", uap_id: "19101077", full_name: "Fariha Chowdhury", phone_number: "01844668800", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u20201055", uap_id: "20201055", full_name: "Mehedi Hasan Shamim", phone_number: "01955779911", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u21201044", uap_id: "21201044", full_name: "Sabrina Yasmin", phone_number: "01311335577", is_donor: true, account_status: "active", password: "password123" }
+export const INITIAL_USERS: User[] = [
+  { user_id: "u14101095", uap_id: "14101095", full_name: "Tanvir Hasan", phone_number: "01711223344", is_donor: true, account_status: "active" },
+  { user_id: "u24202074", uap_id: "24202074", full_name: "Arifur Rahman", phone_number: "01812345678", is_donor: true, account_status: "active" },
+  { user_id: "u18101023", uap_id: "18101023", full_name: "Nusrat Jahan", phone_number: "01911998877", is_donor: true, account_status: "active" },
+  { user_id: "u19201056", uap_id: "19201056", full_name: "Sumaiya Akter", phone_number: "01555667788", is_donor: true, account_status: "active" },
+  { user_id: "u20101088", uap_id: "20101088", full_name: "Farhan Ahmed", phone_number: "01677889900", is_donor: true, account_status: "active" },
+  { user_id: "u21101012", uap_id: "21101012", full_name: "Mahfuzur Rahman", phone_number: "01300112233", is_donor: true, account_status: "active" },
+  { user_id: "u22101045", uap_id: "22101045", full_name: "Kazi Nazrul Islam", phone_number: "01722334455", is_donor: true, account_status: "active" },
+  { user_id: "u23101067", uap_id: "23101067", full_name: "Tasmia Islam", phone_number: "01833445566", is_donor: true, account_status: "active" },
+  { user_id: "u15101034", uap_id: "15101034", full_name: "Rakibul Hossain", phone_number: "01944556677", is_donor: true, account_status: "active" },
+  { user_id: "u16201089", uap_id: "16201089", full_name: "Shahriar Kabir", phone_number: "01511224466", is_donor: true, account_status: "active" },
+  { user_id: "u17101099", uap_id: "17101099", full_name: "Sadia Sultana", phone_number: "01622446688", is_donor: true, account_status: "active" },
+  { user_id: "u18201011", uap_id: "18201011", full_name: "Imtiaz Mahmud", phone_number: "01733557799", is_donor: true, account_status: "active" },
+  { user_id: "u19101077", uap_id: "19101077", full_name: "Fariha Chowdhury", phone_number: "01844668800", is_donor: true, account_status: "active" },
+  { user_id: "u20201055", uap_id: "20201055", full_name: "Mehedi Hasan Shamim", phone_number: "01955779911", is_donor: true, account_status: "active" },
+  { user_id: "u21201044", uap_id: "21201044", full_name: "Sabrina Yasmin", phone_number: "01311335577", is_donor: true, account_status: "active" }
 ];
 
 export const INITIAL_DONORS: DonorDetails[] = [
@@ -67,20 +69,19 @@ export const INITIAL_DONORS: DonorDetails[] = [
 ];
 
 export const authService = {
-  register: (userData: Omit<User, 'user_id'> & { password: string }) => {
+  register: (userData: Omit<User, 'user_id'>) => {
     const users = authService.getAllUsers();
     if (users.some(u => u.uap_id === userData.uap_id)) {
       throw new Error('UAP ID already registered');
     }
 
-    const newUser: User & { password: string } = {
+    const newUser: User = {
       user_id: crypto.randomUUID(),
       uap_id: userData.uap_id,
       full_name: userData.full_name,
       phone_number: userData.phone_number,
       is_donor: userData.is_donor,
       account_status: 'active',
-      password: userData.password
     };
 
     users.push(newUser);
@@ -95,24 +96,23 @@ export const authService = {
     return { user_id: newUser.user_id, uap_id: newUser.uap_id, full_name: newUser.full_name };
   },
 
-  login: (uap_id: string, password: string) => {
+  login: (uap_id: string) => {
     const users = authService.getAllUsers();
-    const user = users.find(u => u.uap_id === uap_id && u.password === password);
+    const user = users.find(u => u.uap_id === uap_id);
     
     if (!user) {
-      throw new Error('Invalid UAP ID or password');
+      throw new Error('Invalid UAP ID');
     }
 
-    const { password: _, ...userWithoutPassword } = user;
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userWithoutPassword));
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
 
     fetch('/api/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'login', uap_id, password })
+      body: JSON.stringify({ action: 'login', uap_id })
     }).catch(() => {});
     
-    return userWithoutPassword;
+    return user;
   },
 
   logout: () => {
@@ -124,9 +124,9 @@ export const authService = {
     return userStr ? JSON.parse(userStr) : null;
   },
 
-  getAllUsers: (): Array<User & { password: string }> => {
+  getAllUsers: (): User[] => {
     const usersStr = localStorage.getItem(USERS_KEY);
-    let users: Array<User & { password: string }> = [];
+    let users: User[] = [];
     if (usersStr) {
       try {
         users = JSON.parse(usersStr);
@@ -161,8 +161,7 @@ export const authService = {
 
     const currentUser = authService.getCurrentUser();
     if (currentUser && currentUser.user_id === userId) {
-      const { password: _, ...userWithoutPassword } = users[userIndex];
-      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userWithoutPassword));
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(users[userIndex]));
     }
   }
 };
@@ -260,24 +259,13 @@ export const donorService = {
   },
 
   isDonorAvailable: (donor: DonorDetails): boolean => {
-    if (!donor.last_donation_date) return true;
-    const lastDonationDate = new Date(donor.last_donation_date);
-    const today = new Date();
-    const lastTime = new Date(lastDonationDate.getFullYear(), lastDonationDate.getMonth(), lastDonationDate.getDate()).getTime();
-    const todayTime = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-    const daysSinceLastDonation = Math.floor((todayTime - lastTime) / (1000 * 60 * 60 * 24));
-    return daysSinceLastDonation >= 105;
+    const status = calculateDonationEligibility(donor.last_donation_date);
+    return status.isEligible;
   },
 
   getDaysUntilAvailable: (lastDonationDateStr: string): number => {
-    if (!lastDonationDateStr) return 0;
-    const lastDate = new Date(lastDonationDateStr);
-    const today = new Date();
-    const lastTime = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate()).getTime();
-    const todayTime = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-    const daysSince = Math.floor((todayTime - lastTime) / (1000 * 60 * 60 * 24));
-    const daysRemaining = 105 - daysSince;
-    return daysRemaining > 0 ? daysRemaining : 0;
+    const status = calculateDonationEligibility(lastDonationDateStr);
+    return status.daysRemaining;
   },
 
   markAsDonated: (userId: string) => {
@@ -289,10 +277,10 @@ export const donorService = {
     }
 
     const currentDonor = donors[donorIndex];
+    const status = calculateDonationEligibility(currentDonor.last_donation_date);
 
-    if (!donorService.isDonorAvailable(currentDonor)) {
-      const daysRemaining = donorService.getDaysUntilAvailable(currentDonor.last_donation_date);
-      throw new Error(`You have already recorded a recent donation. You will be eligible to donate again in ${daysRemaining} days.`);
+    if (!status.isEligible) {
+      throw new Error(`Medical Warning: Safety protocols require a 90-day cooldown between donations. You will be eligible to donate again on ${status.formattedNextEligibleDate} (${status.daysRemaining} days remaining).`);
     }
 
     const today = new Date().toISOString().split('T')[0];

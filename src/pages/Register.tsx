@@ -4,82 +4,98 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { authService } from "@/lib/auth";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/Header";
-import { Droplets } from "lucide-react";
+import { maskNumericId, maskPhoneNumber, validatePhoneNumber } from "@/logic/masking";
+import { usePageTitle } from "@/hooks/usePageTitle";
+import { Droplets, Eye, EyeOff, AlertCircle } from "lucide-react";
 
 export default function Register() {
+  usePageTitle("Register as Donor");
   const [formData, setFormData] = useState({
     uap_id: "",
+    email: "",
     password: "",
     confirmPassword: "",
     full_name: "",
     phone_number: "",
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signUp } = useAuth();
 
   const validateUapId = (uapId: string) => {
-    // Basic UAP ID format validation (adjust as needed)
     return uapId.length >= 5;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    const newErrors: Record<string, string> = {};
 
-    // Validation
     if (!validateUapId(formData.uap_id)) {
-      toast({
-        title: "Invalid UAP ID",
-        description: "Please enter a valid UAP ID",
-        variant: "destructive",
-      });
-      setIsLoading(false);
-      return;
+      newErrors.uap_id = "Please enter a valid numeric UAP ID (at least 5 digits)";
+    }
+
+    if (!validatePhoneNumber(formData.phone_number)) {
+      newErrors.phone_number = "Please enter a valid phone number (e.g., +880 1711-223344 or 01711223344)";
     }
 
     if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: "Passwords don't match",
-        description: "Please make sure your passwords match",
-        variant: "destructive",
-      });
-      setIsLoading(false);
-      return;
+      newErrors.confirmPassword = "Passwords don't match";
     }
 
     if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      setIsLoading(false);
       toast({
-        title: "Weak password",
-        description: "Password must be at least 6 characters",
+        title: "Validation Error",
+        description: "Please fix the errors indicated in the form below.",
         variant: "destructive",
       });
-      setIsLoading(false);
       return;
     }
 
+    setErrors({});
+
     try {
-      authService.register({
-        uap_id: formData.uap_id,
-        password: formData.password,
+      const email = formData.email || `${formData.uap_id}@uap-bd.edu`;
+      
+      const { data, error } = await signUp(email, formData.password, {
         full_name: formData.full_name,
-        phone_number: formData.phone_number,
-        is_donor: false,
-        account_status: 'active',
+        phone: formData.phone_number,
+        uap_id: formData.uap_id,
       });
 
-      toast({
-        title: "Registration successful",
-        description: "Your account has been created. Please login.",
-      });
-      navigate("/login");
-    } catch (error) {
+      if (error) {
+        setErrors({ general: error.message });
+        toast({
+          title: "Registration failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Registration successful",
+          description: data.session ? "Welcome to UAP Blood Bank!" : "Your account has been created. Please login.",
+        });
+        navigate("/login");
+      }
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "An error occurred during registration";
+      setErrors({ general: msg });
       toast({
         title: "Registration failed",
-        description: error instanceof Error ? error.message : "An error occurred",
+        description: msg,
         variant: "destructive",
       });
     } finally {
@@ -94,7 +110,7 @@ export default function Register() {
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1 text-center">
             <div className="flex justify-center mb-2">
-              <Droplets className="h-12 w-12 text-accent" />
+              <Droplets className="h-12 w-12 text-accent" aria-hidden="true" />
             </div>
             <CardTitle className="text-2xl">Register for UAP Blood Bank</CardTitle>
             <CardDescription>
@@ -103,16 +119,47 @@ export default function Register() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {errors.general && (
+                <div
+                  role="alert"
+                  aria-live="polite"
+                  className="p-3 text-sm rounded-md bg-destructive/10 text-destructive border border-destructive/20 flex items-center gap-2"
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>{errors.general}</span>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="uap_id">UAP ID</Label>
                 <Input
                   id="uap_id"
-                  placeholder="Enter your UAP ID"
+                  inputMode="numeric"
+                  placeholder="e.g. 14101095"
                   value={formData.uap_id}
-                  onChange={(e) => setFormData({ ...formData, uap_id: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, uap_id: maskNumericId(e.target.value) })}
                   required
+                  aria-invalid={Boolean(errors.uap_id)}
+                  aria-describedby={errors.uap_id ? "uap_id-error" : undefined}
+                />
+                {errors.uap_id && (
+                  <p id="uap_id-error" className="text-xs text-destructive mt-1">
+                    {errors.uap_id}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email (Optional)</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email (optional)"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="full_name">Full Name</Label>
                 <Input
@@ -123,40 +170,102 @@ export default function Register() {
                   required
                 />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="phone_number">Phone Number</Label>
                 <Input
                   id="phone_number"
                   type="tel"
-                  placeholder="Enter your phone number"
+                  inputMode="tel"
+                  placeholder="e.g. +880 1711-223344"
                   value={formData.phone_number}
-                  onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, phone_number: maskPhoneNumber(e.target.value) })}
                   required
+                  aria-invalid={Boolean(errors.phone_number)}
+                  aria-describedby={errors.phone_number ? "phone_number-error" : undefined}
                 />
+                {errors.phone_number && (
+                  <p id="phone_number-error" className="text-xs text-destructive mt-1">
+                    {errors.phone_number}
+                  </p>
+                )}
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Create a password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Create a password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    required
+                    autoComplete="new-password"
+                    className="pr-10"
+                    aria-invalid={Boolean(errors.password)}
+                    aria-describedby={errors.password ? "password-error" : undefined}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground min-h-[44px] min-w-[44px]"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <Eye className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </Button>
+                </div>
+                {errors.password && (
+                  <p id="password-error" className="text-xs text-destructive mt-1">
+                    {errors.password}
+                  </p>
+                )}
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="Confirm your password"
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm your password"
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                    required
+                    autoComplete="new-password"
+                    className="pr-10"
+                    aria-invalid={Boolean(errors.confirmPassword)}
+                    aria-describedby={errors.confirmPassword ? "confirmPassword-error" : undefined}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground min-h-[44px] min-w-[44px]"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <Eye className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </Button>
+                </div>
+                {errors.confirmPassword && (
+                  <p id="confirmPassword-error" className="text-xs text-destructive mt-1">
+                    {errors.confirmPassword}
+                  </p>
+                )}
               </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
+
+              <Button type="submit" className="w-full min-h-[44px]" disabled={isLoading}>
                 {isLoading ? "Creating account..." : "Register"}
               </Button>
             </form>
@@ -164,7 +273,7 @@ export default function Register() {
           <CardFooter className="flex flex-col space-y-2">
             <div className="text-sm text-muted-foreground text-center">
               Already have an account?{" "}
-              <Link to="/login" className="text-primary hover:underline">
+              <Link to="/login" className="text-primary hover:underline min-h-[44px] inline-flex items-center">
                 Login here
               </Link>
             </div>

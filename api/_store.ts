@@ -36,21 +36,21 @@ export interface Confirmation {
 }
 
 export const INITIAL_USERS: User[] = [
-  { user_id: "u14101095", uap_id: "14101095", full_name: "Tanvir Hasan", phone_number: "01711223344", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u24202074", uap_id: "24202074", full_name: "Arifur Rahman", phone_number: "01812345678", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u18101023", uap_id: "18101023", full_name: "Nusrat Jahan", phone_number: "01911998877", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u19201056", uap_id: "19201056", full_name: "Sumaiya Akter", phone_number: "01555667788", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u20101088", uap_id: "20101088", full_name: "Farhan Ahmed", phone_number: "01677889900", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u21101012", uap_id: "21101012", full_name: "Mahfuzur Rahman", phone_number: "01300112233", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u22101045", uap_id: "22101045", full_name: "Kazi Nazrul Islam", phone_number: "01722334455", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u23101067", uap_id: "23101067", full_name: "Tasmia Islam", phone_number: "01833445566", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u15101034", uap_id: "15101034", full_name: "Rakibul Hossain", phone_number: "01944556677", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u16201089", uap_id: "16201089", full_name: "Shahriar Kabir", phone_number: "01511224466", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u17101099", uap_id: "17101099", full_name: "Sadia Sultana", phone_number: "01622446688", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u18201011", uap_id: "18201011", full_name: "Imtiaz Mahmud", phone_number: "01733557799", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u19101077", uap_id: "19101077", full_name: "Fariha Chowdhury", phone_number: "01844668800", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u20201055", uap_id: "20201055", full_name: "Mehedi Hasan Shamim", phone_number: "01955779911", is_donor: true, account_status: "active", password: "password123" },
-  { user_id: "u21201044", uap_id: "21201044", full_name: "Sabrina Yasmin", phone_number: "01311335577", is_donor: true, account_status: "active", password: "password123" }
+  { user_id: "u14101095", uap_id: "14101095", full_name: "Tanvir Hasan", phone_number: "01711223344", is_donor: true, account_status: "active" },
+  { user_id: "u24202074", uap_id: "24202074", full_name: "Arifur Rahman", phone_number: "01812345678", is_donor: true, account_status: "active" },
+  { user_id: "u18101023", uap_id: "18101023", full_name: "Nusrat Jahan", phone_number: "01911998877", is_donor: true, account_status: "active" },
+  { user_id: "u19201056", uap_id: "19201056", full_name: "Sumaiya Akter", phone_number: "01555667788", is_donor: true, account_status: "active" },
+  { user_id: "u20101088", uap_id: "20101088", full_name: "Farhan Ahmed", phone_number: "01677889900", is_donor: true, account_status: "active" },
+  { user_id: "u21101012", uap_id: "21101012", full_name: "Mahfuzur Rahman", phone_number: "01300112233", is_donor: true, account_status: "active" },
+  { user_id: "u22101045", uap_id: "22101045", full_name: "Kazi Nazrul Islam", phone_number: "01722334455", is_donor: true, account_status: "active" },
+  { user_id: "u23101067", uap_id: "23101067", full_name: "Tasmia Islam", phone_number: "01833445566", is_donor: true, account_status: "active" },
+  { user_id: "u15101034", uap_id: "15101034", full_name: "Rakibul Hossain", phone_number: "01944556677", is_donor: true, account_status: "active" },
+  { user_id: "u16201089", uap_id: "16201089", full_name: "Shahriar Kabir", phone_number: "01511224466", is_donor: true, account_status: "active" },
+  { user_id: "u17101099", uap_id: "17101099", full_name: "Sadia Sultana", phone_number: "01622446688", is_donor: true, account_status: "active" },
+  { user_id: "u18201011", uap_id: "18201011", full_name: "Imtiaz Mahmud", phone_number: "01733557799", is_donor: true, account_status: "active" },
+  { user_id: "u19101077", uap_id: "19101077", full_name: "Fariha Chowdhury", phone_number: "01844668800", is_donor: true, account_status: "active" },
+  { user_id: "u20201055", uap_id: "20201055", full_name: "Mehedi Hasan Shamim", phone_number: "01955779911", is_donor: true, account_status: "active" },
+  { user_id: "u21201044", uap_id: "21201044", full_name: "Sabrina Yasmin", phone_number: "01311335577", is_donor: true, account_status: "active" }
 ];
 
 export const INITIAL_DONORS: DonorDetails[] = [
@@ -72,11 +72,20 @@ export const INITIAL_DONORS: DonorDetails[] = [
 ];
 
 // Fallback in-memory arrays
-export let memoryUsers: User[] = [...INITIAL_USERS];
-export let memoryDonors: DonorDetails[] = [...INITIAL_DONORS];
-export let memoryConfirmations: Confirmation[] = [];
+export const memoryUsers: User[] = [...INITIAL_USERS];
+export const memoryDonors: DonorDetails[] = [...INITIAL_DONORS];
+export const memoryConfirmations: Confirmation[] = [];
 
-export function applyCors(req: any, res: any) {
+export interface SimpleReq {
+  method?: string;
+}
+
+export interface SimpleRes {
+  setHeader: (key: string, value: string) => void;
+  status: (code: number) => { end: () => void };
+}
+
+export function applyCors(req: SimpleReq, res: SimpleRes) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');

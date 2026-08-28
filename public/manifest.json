@@ -1,0 +1,17 @@
+{
+  "short_name": "UAP Blood",
+  "name": "UAP Blood Bank Platform",
+  "description": "Connecting voluntary blood donors with patients in need within the University of Asia Pacific community.",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#e11d48",
+  "display": "standalone",
+  "orientation": "portrait"
+}
