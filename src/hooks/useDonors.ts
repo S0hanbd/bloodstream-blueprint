@@ -136,7 +136,11 @@ export function useRegisterDonor() {
         }
       }
 
-      return donorService.registerDonor(donorData);
+      try {
+        return donorService.registerDonor(donorData);
+      } catch {
+        return donorService.updateDonor(donorData.user_id, donorData);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["donors"] });
@@ -187,7 +191,6 @@ export function useHideProfile() {
   return useMutation({
     mutationFn: async (userId: string) => {
       if (isSupabaseConfigured && supabase) {
-        // Temporarily store current blood_type as hidden marker
         const { error } = await supabase
           .from("profiles")
           .update({ blood_type: "hidden" })

@@ -117,21 +117,24 @@ export default function Dashboard() {
           userId,
           updates: donorForm,
         });
-        toast({
-          title: "Donor Profile Updated",
-          description: "Your donor information has been saved successfully.",
-        });
       } else {
-        await registerDonorMutation.mutateAsync({
-          user_id: userId,
-          ...donorForm,
-          total_donations: 0,
-        });
-        toast({
-          title: "Registered as Donor",
-          description: "You are now registered and visible in search results!",
-        });
+        try {
+          await registerDonorMutation.mutateAsync({
+            user_id: userId,
+            ...donorForm,
+            total_donations: 0,
+          });
+        } catch {
+          await updateDonorMutation.mutateAsync({
+            userId,
+            updates: donorForm,
+          });
+        }
       }
+      toast({
+        title: "Donor Profile Saved!",
+        description: "Your donor information has been saved and is now live in search results.",
+      });
       setDonorDetails({
         donor_id: userId,
         user_id: userId,
