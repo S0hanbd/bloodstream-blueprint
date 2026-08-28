@@ -11,7 +11,7 @@ import { authService, donorService, type DonorDetails } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/Header";
 import { useAuth } from "@/hooks/useAuth";
-import { useUpdateDonor, useRegisterDonor, useRecordDonation } from "@/hooks/useDonors";
+import { useUpdateDonor, useRegisterDonor, useRecordDonation, useHideProfile, useShowProfile, useDeleteProfile } from "@/hooks/useDonors";
 import { DonationForm } from "@/components/donations/DonationForm";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { User, Heart, EyeOff, Trash2, Loader2 } from "lucide-react";
@@ -138,39 +138,79 @@ export default function Dashboard() {
     }
   };
 
-  const handleHideAccount = () => {
-    if (!currentUser) return;
-    
-    authService.updateUser(currentUser.user_id, { account_status: 'hidden' });
-    toast({
-      title: "Account Hidden",
-      description: "Your profile is now temporarily hidden from search results",
-    });
-    setCurrentUser({ ...currentUser, account_status: 'hidden' });
+  const hideProfileMutation = useHideProfile();
+  const showProfileMutation = useShowProfile();
+  const deleteProfileMutation = useDeleteProfile();
+
+  const handleHideAccount = async () => {
+    const userId = currentUser?.user_id || supabaseUser?.id;
+    if (!userId) return;
+
+    try {
+      await hideProfileMutation.mutateAsync(userId);
+      if (currentUser) {
+        authService.updateUser(currentUser.user_id, { account_status: 'hidden' });
+        setCurrentUser({ ...currentUser, account_status: 'hidden' });
+      }
+      toast({
+        title: "Account Hidden",
+        description: "Your profile is now temporarily hidden from donor search results.",
+      });
+    } catch (err: unknown) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Could not hide account",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleShowAccount = () => {
-    if (!currentUser) return;
-    
-    authService.updateUser(currentUser.user_id, { account_status: 'active' });
-    toast({
-      title: "Account Visible",
-      description: "Your profile is now visible in search results",
-    });
-    setCurrentUser({ ...currentUser, account_status: 'active' });
+  const handleShowAccount = async () => {
+    const userId = currentUser?.user_id || supabaseUser?.id;
+    if (!userId) return;
+
+    try {
+      await showProfileMutation.mutateAsync({ userId, bloodGroup: donorForm.blood_group || "A+" });
+      if (currentUser) {
+        authService.updateUser(currentUser.user_id, { account_status: 'active' });
+        setCurrentUser({ ...currentUser, account_status: 'active' });
+      }
+      toast({
+        title: "Account Visible",
+        description: "Your profile is now visible in donor search results.",
+      });
+    } catch (err: unknown) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Could not make account visible",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDeleteAccount = async () => {
-    if (!currentUser) return;
-    
-    authService.updateUser(currentUser.user_id, { account_status: 'deleted' });
-    authService.logout();
-    await signOut();
-    toast({
-      title: "Account Deleted",
-      description: "Your account has been permanently deleted",
-    });
-    navigate("/");
+    const userId = currentUser?.user_id || supabaseUser?.id;
+    if (!userId) return;
+
+    try {
+      await deleteProfileMutation.mutateAsync(userId);
+      if (currentUser) {
+        authService.updateUser(currentUser.user_id, { account_status: 'deleted' });
+      }
+      authService.logout();
+      await signOut();
+      toast({
+        title: "Account Deleted",
+        description: "Your account and profile details have been permanently deleted.",
+      });
+      navigate("/");
+    } catch (err: unknown) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Could not delete account",
+        variant: "destructive",
+      });
+    }
   };
 
   if (!currentUser && !supabaseUser) {

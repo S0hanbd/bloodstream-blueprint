@@ -39,30 +39,33 @@ export function useDonors(filters?: { bloodGroup?: string; searchQuery?: string 
         }
 
         if (profiles && profiles.length > 0) {
-          let results: DonorWithUser[] = (profiles as ProfileRecord[]).map((p: ProfileRecord) => {
-            const lastDonation = p.last_donation_date || "";
-            const isAvailable = calculateDonationEligibility(lastDonation).isEligible;
+          // Filter out profiles with null blood_type (hidden or unregistered profiles)
+          let results: DonorWithUser[] = (profiles as ProfileRecord[])
+            .filter((p) => p.blood_type !== null && p.blood_type !== "hidden")
+            .map((p: ProfileRecord) => {
+              const lastDonation = p.last_donation_date || "";
+              const isAvailable = calculateDonationEligibility(lastDonation).isEligible;
 
-            return {
-              donor_id: p.id,
-              user_id: p.id,
-              blood_group: p.blood_type || "A+",
-              last_donation_date: lastDonation,
-              department: "General",
-              batch_name: "Active",
-              city_area: "Dhaka",
-              total_donations: 0,
-              user: {
+              return {
+                donor_id: p.id,
                 user_id: p.id,
-                uap_id: p.national_id || p.id.substring(0, 8),
-                full_name: p.full_name || "Anonymous Donor",
-                phone_number: p.phone || "N/A",
-                is_donor: true,
-                account_status: "active",
-              },
-              isAvailable,
-            };
-          });
+                blood_group: p.blood_type || "A+",
+                last_donation_date: lastDonation,
+                department: "General",
+                batch_name: "Active",
+                city_area: "Dhaka",
+                total_donations: 0,
+                user: {
+                  user_id: p.id,
+                  uap_id: p.national_id || p.id.substring(0, 8),
+                  full_name: p.full_name || "Anonymous Donor",
+                  phone_number: p.phone || "N/A",
+                  is_donor: true,
+                  account_status: "active",
+                },
+                isAvailable,
+              };
+            });
 
           if (searchQuery && searchQuery.trim()) {
             const q = searchQuery.toLowerCase().trim();
@@ -109,7 +112,6 @@ export function useUpdateDonor() {
       return donorService.updateDonor(userId, updates);
     },
     onSuccess: () => {
-      // Invalidate and refetch all donor query caches
       queryClient.invalidateQueries({ queryKey: ["donors"] });
     },
   });
@@ -172,6 +174,76 @@ export function useRecordDonation() {
       }
 
       return donorService.markAsDonated(userId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["donors"] });
+    },
+  });
+}
+
+export function useHideProfile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      if (isSupabaseConfigured && supabase) {
+        // Temporarily store current blood_type as hidden marker
+        const { error } = await supabase
+          .from("profiles")
+          .update({ blood_type: "hidden" })
+          .eq("id", userId);
+
+        if (error) {
+          throw new Error(error.message);
+        }
+      }
+      return donorService.updateUser(userId, { account_status: "hidden" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["donors"] });
+    },
+  });
+}
+
+export function useShowProfile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ userId, bloodGroup }: { userId: string; bloodGroup: string }) => {
+      if (isSupabaseConfigured && supabase) {
+        const { error } = await supabase
+          .from("profiles")
+          .update({ blood_type: bloodGroup || "A+" })
+          .eq("id", userId);
+
+        if (error) {
+          throw new Error(error.message);
+        }
+      }
+      return donorService.updateUser(userId, { account_status: "active" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["donors"] });
+    },
+  });
+}
+
+export function useDeleteProfile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      if (isSupabaseConfigured && supabase) {
+        const { error } = await supabase
+          .from("profiles")
+          .delete()
+          .eq("id", userId);
+
+        if (error) {
+          throw new Error(error.message);
+        }
+      }
+      return donorService.updateUser(userId, { account_status: "deleted" });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["donors"] });
