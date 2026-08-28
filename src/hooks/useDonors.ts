@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { donorService, type DonorDetails, type User } from "@/lib/auth";
+import { authService, donorService, type DonorDetails, type User } from "@/lib/auth";
 import { calculateDonationEligibility } from "@/logic/cooldown";
 
 export interface DonorWithUser extends DonorDetails {
@@ -230,7 +230,7 @@ export function useHideProfile() {
           throw new Error(error.message);
         }
       }
-      return donorService.updateUser(userId, { account_status: "hidden" });
+      return authService.updateUser(userId, { account_status: "hidden" });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["donors"] });
@@ -253,7 +253,7 @@ export function useShowProfile() {
           throw new Error(error.message);
         }
       }
-      return donorService.updateUser(userId, { account_status: "active" });
+      return authService.updateUser(userId, { account_status: "active" });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["donors"] });
@@ -276,7 +276,7 @@ export function useDeleteProfile() {
           throw new Error(error.message);
         }
       }
-      return donorService.updateUser(userId, { account_status: "deleted" });
+      return authService.updateUser(userId, { account_status: "deleted" });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["donors"] });
