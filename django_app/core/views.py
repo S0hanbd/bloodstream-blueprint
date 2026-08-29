@@ -6,6 +6,28 @@ from .supabase_service import SupabaseService
 from .forms import SingleRegistrationForm, LoginForm, BloodRequestForm, ProfileReportForm
 import datetime
 
+def get_user_profile(user_data):
+    """Safely retrieves UserProfile matching uap_id, national_id, user_id, profile_uuid, or email."""
+    if not user_data or not isinstance(user_data, dict):
+        return UserProfile.objects.first()
+
+    uap_id = user_data.get('uap_id') or user_data.get('national_id')
+    user_id = user_data.get('user_id') or user_data.get('id')
+    email = user_data.get('email')
+
+    profile = None
+    if uap_id:
+        profile = UserProfile.objects.filter(uap_id=uap_id).first()
+    if not profile and user_id:
+        profile = UserProfile.objects.filter(models.Q(profile_uuid=user_id) | models.Q(id=user_id if str(user_id).isdigit() else -1)).first()
+    if not profile and email:
+        profile = UserProfile.objects.filter(email=email).first()
+
+    if not profile:
+        profile = UserProfile.objects.first()
+    return profile
+
+
 def index_view(request):
     donors = SupabaseService.get_donors()
     stats = SupabaseService.get_statistics()
@@ -97,14 +119,12 @@ def dashboard_view(request):
         messages.warning(request, "Please log in to access your donor dashboard.")
         return redirect('login')
 
-    profile = UserProfile.objects.filter(uap_id=user['uap_id']).first()
-    if not profile:
-        profile = UserProfile.objects.first()
+    profile = get_user_profile(user)
 
     if request.method == 'POST':
         action = request.POST.get('action')
         
-        if action == 'update_privacy':
+        if action == 'update_privacy' and profile:
             profile.show_phone_publicly = request.POST.get('show_phone_publicly') == 'on'
             profile.allow_contact_requests = request.POST.get('allow_contact_requests') == 'on'
             profile.profile_visible = request.POST.get('profile_visible') == 'on'
@@ -112,21 +132,22 @@ def dashboard_view(request):
             messages.success(request, "Privacy settings updated successfully!")
             return redirect('dashboard')
 
-        # Standard profile update
-        profile.full_name = request.POST.get('full_name', profile.full_name)
-        profile.phone = request.POST.get('phone_number', profile.phone)
-        profile.blood_group = request.POST.get('blood_group', profile.blood_group)
-        profile.department = request.POST.get('department', profile.department)
-        profile.batch_name = request.POST.get('batch_name', profile.batch_name)
-        profile.city_area = request.POST.get('city_area', profile.city_area)
-        profile.save()
+        if profile:
+            profile.full_name = request.POST.get('full_name', profile.full_name)
+            profile.phone = request.POST.get('phone_number', profile.phone)
+            profile.blood_group = request.POST.get('blood_group', profile.blood_group)
+            profile.department = request.POST.get('department', profile.department)
+            profile.batch_name = request.POST.get('batch_name', profile.batch_name)
+            profile.city_area = request.POST.get('city_area', profile.city_area)
+            profile.save()
 
-        user['full_name'] = profile.full_name
-        user['phone_number'] = profile.phone
-        request.session['user'] = user
+            if isinstance(user, dict):
+                user['full_name'] = profile.full_name
+                user['phone_number'] = profile.phone
+                request.session['user'] = user
 
-        messages.success(request, "Profile information updated successfully!")
-        return redirect('dashboard')
+            messages.success(request, "Profile information updated successfully!")
+            return redirect('dashboard')
 
     info = profile.availability_info if profile else {'is_eligible': True, 'days_remaining': 0}
     donations = profile.donation_records.order_by('-donation_date') if profile else []
@@ -143,7 +164,7 @@ def record_donation_view(request):
         return redirect('login')
 
     if request.method == 'POST':
-        profile = UserProfile.objects.filter(uap_id=user['uap_id']).first()
+        profile = get_user_profile(user)
         if profile:
             info = profile.availability_info
             if not info['is_eligible']:
@@ -167,7 +188,7 @@ def request_blood_view(request):
             req = form.save(commit=False)
             user = request.session.get('user')
             if user:
-                profile = UserProfile.objects.filter(uap_id=user['uap_id']).first()
+                profile = get_user_profile(user)
                 req.requester = profile
             req.save()
             messages.success(request, f"Emergency Blood Request created for {req.blood_group}! Donors are being matched.")
@@ -247,7 +268,6 @@ def report_profile_view(request, donor_id):
     return render(request, 'report_modal.html', {'form': form, 'donor': profile})
 
 def moderation_view(request):
-    """Admin Verification Queue & Moderation Actions (Approve, Reject, Request Correction, Suspend)"""
     pending_verifications = UserProfile.objects.filter(verification_status='pending')
     reports = ProfileReport.objects.filter(status='pending').order_by('-created_at')
     all_donors = UserProfile.objects.all().order_by('-created_at')
