@@ -68,8 +68,21 @@ export const INITIAL_DONORS: DonorDetails[] = [
   { donor_id: "d21201044", user_id: "u21201044", blood_group: "AB+", last_donation_date: "2024-03-15", department: "Law & Human Rights", batch_name: "Spring 2023", city_area: "Moghbazar, Dhaka", total_donations: 1 }
 ];
 
+export interface RegisterData {
+  uap_id: string;
+  full_name: string;
+  phone_number: string;
+  email?: string;
+  is_donor?: boolean;
+  blood_group?: string;
+  last_donation_date?: string;
+  department?: string;
+  batch_name?: string;
+  city_area?: string;
+}
+
 export const authService = {
-  register: (userData: Omit<User, 'user_id'>) => {
+  register: (userData: RegisterData) => {
     const users = authService.getAllUsers();
     if (users.some(u => u.uap_id === userData.uap_id)) {
       throw new Error('UAP ID already registered');
@@ -80,12 +93,28 @@ export const authService = {
       uap_id: userData.uap_id,
       full_name: userData.full_name,
       phone_number: userData.phone_number,
-      is_donor: userData.is_donor,
+      is_donor: userData.is_donor ?? true,
       account_status: 'active',
     };
 
     users.push(newUser);
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
+
+    if (userData.blood_group) {
+      try {
+        donorService.registerDonor({
+          user_id: newUser.user_id,
+          blood_group: userData.blood_group,
+          last_donation_date: userData.last_donation_date || '',
+          department: userData.department || 'General',
+          batch_name: userData.batch_name || 'UAP',
+          city_area: userData.city_area || 'Dhaka',
+          total_donations: userData.last_donation_date ? 1 : 0,
+        });
+      } catch (e) {
+        console.warn('Could not auto-register donor record:', e);
+      }
+    }
 
     fetch('/api/auth', {
       method: 'POST',
