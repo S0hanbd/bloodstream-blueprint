@@ -1,0 +1,160 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="h-full font-sans antialiased">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}UAP Bloodstream Portal{% endblock %}</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#fff1f2',
+                            100: '#ffe4e6',
+                            500: '#f43f5e',
+                            600: '#e11d48',
+                            700: '#be123c',
+                            800: '#9f1239',
+                            900: '#881337',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        heading: ['"Outfit"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body class="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
+    
+    <!-- Top Emergency Announcement Bar -->
+    <div class="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white text-xs sm:text-sm font-medium py-2 px-4 text-center flex items-center justify-center gap-2 shadow-sm">
+        <span class="inline-block w-2 h-2 rounded-full bg-white animate-ping"></span>
+        <span>Emergency Blood Needed at UAP Campus & Nearby Dhaka Hospitals!</span>
+        <a href="{% url 'request_blood' %}" class="underline font-bold hover:text-red-100 ml-1">Submit Blood Request &rarr;</a>
+    </div>
+
+    <!-- Main Navigation Bar -->
+    <header class="sticky top-0 z-50 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 transition-all">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16 sm:h-20">
+                
+                <!-- Logo -->
+                <a href="{% url 'index' %}" class="flex items-center gap-3 group">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-500 flex items-center justify-center text-white shadow-md shadow-red-500/20 group-hover:scale-105 transition-transform">
+                        <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+                    </div>
+                    <div>
+                        <span class="font-heading text-xl sm:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-red-600 to-rose-600 dark:from-red-500 dark:to-rose-400 bg-clip-text text-transparent">
+                            Bloodstream
+                        </span>
+                        <span class="hidden sm:inline-block text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                            UAP
+                        </span>
+                    </div>
+                </a>
+
+                <!-- Desktop Navigation Links -->
+                <nav class="hidden md:flex items-center gap-1 font-medium text-sm">
+                    <a href="{% url 'index' %}" class="px-3.5 py-2 rounded-lg text-slate-700 dark:text-slate-200 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                        Home
+                    </a>
+                    <a href="{% url 'search' %}" class="px-3.5 py-2 rounded-lg text-slate-700 dark:text-slate-200 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        Find Donors
+                    </a>
+                    <a href="{% url 'blood_requests' %}" class="px-3.5 py-2 rounded-lg text-slate-700 dark:text-slate-200 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                        Blood Requests
+                    </a>
+                    <a href="{% url 'moderation' %}" class="px-3.5 py-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                        Moderation
+                    </a>
+                </nav>
+
+                <!-- Action Buttons / User Menu -->
+                <div class="flex items-center gap-3">
+                    <a href="{% url 'request_blood' %}" class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/80 hover:bg-rose-100 text-xs font-bold transition">
+                        + Request Blood
+                    </a>
+
+                    {% if current_user %}
+                        <a href="{% url 'dashboard' %}" class="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/50 hover:bg-red-100 dark:hover:bg-red-900/50 text-xs font-bold transition">
+                            <span>Dashboard ({{ current_user.full_name|truncatechars:10 }})</span>
+                        </a>
+                        <a href="{% url 'logout' %}" class="px-2.5 py-2 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white transition">
+                            Logout
+                        </a>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="px-3 py-2 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 text-xs font-semibold transition">
+                            Login
+                        </a>
+                        <a href="{% url 'register' %}" class="px-4 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 text-white text-xs font-bold shadow-md shadow-red-600/20 hover:shadow-lg transition">
+                            Register
+                        </a>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+    </header>
+
+    <!-- Flash Messages Toast Container -->
+    {% if messages %}
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+            {% for message in messages %}
+                <div class="p-4 mb-3 rounded-xl border flex items-center justify-between text-sm font-medium shadow-sm transition-all
+                    {% if message.tags == 'error' %} bg-rose-50 dark:bg-rose-950/60 text-rose-800 dark:text-rose-200 border-rose-200 dark:border-rose-800
+                    {% elif message.tags == 'success' %} bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800
+                    {% else %} bg-sky-50 dark:bg-sky-950/60 text-sky-800 dark:text-sky-200 border-sky-200 dark:border-sky-800 {% endif %}">
+                    <div class="flex items-center gap-2">
+                        {% if message.tags == 'error' %}
+                            <svg class="w-5 h-5 text-rose-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        {% else %}
+                            <svg class="w-5 h-5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        {% endif %}
+                        <span>{{ message }}</span>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <main class="flex-grow">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-10 mt-12 transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div>
+                <div class="flex items-center justify-center sm:justify-start gap-2 font-heading font-bold text-lg text-slate-800 dark:text-slate-100">
+                    <span class="w-3 h-3 rounded-full bg-red-600 inline-block"></span>
+                    UAP Bloodstream Portal
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Verified UAP Donor Registry & Emergency Blood Request Network.
+                </p>
+            </div>
+            <div class="text-xs text-slate-400">
+                &copy; 2026 UAP Bloodstream. Phone Privacy & Controlled Access Protected.
+            </div>
+        </div>
+    </footer>
+
+    <script src="{% static 'js/main.js' %}"></script>
+</body>
+</html>

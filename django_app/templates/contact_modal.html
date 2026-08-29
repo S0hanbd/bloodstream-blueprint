@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block title %}Contact Donor - Privacy Flow{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto px-4 py-16">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xl p-6 sm:p-8 space-y-6">
+        
+        <div class="text-center space-y-2 border-b border-slate-100 dark:border-slate-800 pb-4">
+            <div class="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-950 text-red-600 mx-auto flex items-center justify-center font-bold">
+                <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+            </div>
+            <h1 class="font-heading text-xl font-extrabold text-slate-900 dark:text-white">
+                Contact Donor Request
+            </h1>
+            <p class="text-xs text-slate-500">
+                Contacting <strong>{{ donor.full_name }}</strong> ({{ donor.blood_group }})
+            </p>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 text-xs text-blue-900 dark:text-blue-200 space-y-1">
+            <strong class="font-bold flex items-center gap-1">
+                🔒 Controlled Privacy Protection
+            </strong>
+            <p>Your contact details will be shared with this donor for emergency blood coordination.</p>
+        </div>
+
+        <form method="POST" action="{% url 'contact_donor' donor.user_id %}" class="space-y-4">
+            {% csrf_token %}
+
+            <div class="space-y-1">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">Your Full Name *</label>
+                <input type="text" name="requester_name" required placeholder="e.g. Arif Hossain" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs">
+            </div>
+
+            <div class="space-y-1">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">Your Phone Number *</label>
+                <input type="text" name="requester_phone" required placeholder="e.g. 01711223344" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs">
+            </div>
+
+            <div class="space-y-1">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">Reason / Patient Need</label>
+                <textarea name="reason" rows="2" placeholder="e.g. Emergency surgery patient at Square Hospital needing A+ blood..." class="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"></textarea>
+            </div>
+
+            <button type="submit" class="w-full py-3.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-600/20 transition">
+                Send Contact Request & Reveal Phone
+            </button>
+        </form>
+
+    </div>
+</div>
+{% endblock %}

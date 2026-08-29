@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}Submit Emergency Blood Request - UAP Bloodstream{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-10">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xl p-6 sm:p-10 space-y-6">
+        
+        <div class="text-center space-y-2 border-b border-slate-100 dark:border-slate-800 pb-6">
+            <div class="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950 text-rose-600 mx-auto flex items-center justify-center font-bold">
+                <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+            </div>
+            <h1 class="font-heading text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
+                Submit Emergency Blood Request
+            </h1>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                Broadcast an urgent blood request to matching, verified UAP donors.
+            </p>
+        </div>
+
+        <form method="POST" action="{% url 'request_blood' %}" class="space-y-4">
+            {% csrf_token %}
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="space-y-1">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Patient Name / Identifier *</label>
+                    {{ form.patient_name }}
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Blood Group Required *</label>
+                    {{ form.blood_group }}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="space-y-1">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Units / Bags Needed *</label>
+                    {{ form.units_needed }}
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Urgency Level *</label>
+                    {{ form.urgency }}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="space-y-1">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Hospital Name *</label>
+                    {{ form.hospital_name }}
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Hospital Location / Area *</label>
+                    {{ form.hospital_location }}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="space-y-1">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">When Needed *</label>
+                    {{ form.when_needed }}
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Contact Person *</label>
+                    {{ form.contact_person }}
+                </div>
+            </div>
+
+            <div class="space-y-1">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Contact Phone Number *</label>
+                {{ form.contact_phone }}
+            </div>
+
+            <div class="space-y-1">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Additional Information / Medical Notes</label>
+                {{ form.additional_info }}
+            </div>
+
+            <button type="submit" class="w-full py-4 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-bold text-sm shadow-lg shadow-rose-600/30 transition">
+                Create Emergency Blood Request
+            </button>
+        </form>
+
+    </div>
+</div>
+{% endblock %}

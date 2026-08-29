@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}Report Profile - UAP Bloodstream{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto px-4 py-16">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xl p-6 sm:p-8 space-y-6">
+        
+        <div class="text-center space-y-2 border-b border-slate-100 dark:border-slate-800 pb-4">
+            <div class="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950 text-rose-600 mx-auto flex items-center justify-center font-bold">
+                🚩
+            </div>
+            <h1 class="font-heading text-xl font-extrabold text-slate-900 dark:text-white">
+                Report Donor Profile
+            </h1>
+            <p class="text-xs text-slate-500">
+                Reporting profile for <strong>{{ donor.full_name }}</strong> (UAP ID: {{ donor.uap_id }})
+            </p>
+        </div>
+
+        <form method="POST" action="{% url 'report_profile' donor.user_id %}" class="space-y-4">
+            {% csrf_token %}
+
+            <div class="space-y-1">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">Reason for Report *</label>
+                {{ form.reason }}
+            </div>
+
+            <div class="space-y-1">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">Details / Explanation</label>
+                {{ form.details }}
+            </div>
+
+            <button type="submit" class="w-full py-3.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition">
+                Submit Report to Moderation Team
+            </button>
+        </form>
+
+    </div>
+</div>
+{% endblock %}
