@@ -94,6 +94,10 @@ class UserProfile(models.Model):
         return f"{self.full_name} ({self.blood_group}) - {self.uap_id}"
 
     @property
+    def user_id(self):
+        return str(self.profile_uuid)
+
+    @property
     def calculated_age(self):
         if not self.date_of_birth:
             return 21 # Default fallback

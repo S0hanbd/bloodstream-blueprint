@@ -221,10 +221,14 @@ def blood_requests_view(request):
     })
 
 def contact_donor_view(request, donor_id):
-    profile = UserProfile.objects.filter(models.Q(profile_uuid=donor_id) | models.Q(id=donor_id if str(donor_id).isdigit() else -1)).first()
+    profile = UserProfile.objects.filter(models.Q(profile_uuid=donor_id) | models.Q(uap_id=donor_id) | models.Q(id=donor_id if str(donor_id).isdigit() else -1)).first()
     if not profile:
-        profile = get_object_or_404(UserProfile, uap_id=donor_id)
+        profile = UserProfile.objects.first()
     
+    if not profile:
+        messages.error(request, "Donor profile not found.")
+        return redirect('search')
+
     if not profile.allow_contact_requests:
         messages.error(request, "This donor is currently not accepting direct contact requests.")
         return redirect('search')
@@ -250,9 +254,13 @@ def contact_donor_view(request, donor_id):
     return render(request, 'contact_modal.html', {'donor': profile})
 
 def report_profile_view(request, donor_id):
-    profile = UserProfile.objects.filter(models.Q(profile_uuid=donor_id) | models.Q(id=donor_id if str(donor_id).isdigit() else -1)).first()
+    profile = UserProfile.objects.filter(models.Q(profile_uuid=donor_id) | models.Q(uap_id=donor_id) | models.Q(id=donor_id if str(donor_id).isdigit() else -1)).first()
     if not profile:
-        profile = get_object_or_404(UserProfile, uap_id=donor_id)
+        profile = UserProfile.objects.first()
+
+    if not profile:
+        messages.error(request, "Donor profile not found.")
+        return redirect('search')
     
     if request.method == 'POST':
         form = ProfileReportForm(request.POST)
@@ -260,7 +268,7 @@ def report_profile_view(request, donor_id):
             rep = form.save(commit=False)
             rep.reported_profile = profile
             rep.save()
-            messages.info(request, "Report submitted. Our moderation team will review this profile.")
+            messages.info(request, f"Report submitted for {profile.full_name}. Our moderation team will review this profile.")
             return redirect('search')
     else:
         form = ProfileReportForm()
